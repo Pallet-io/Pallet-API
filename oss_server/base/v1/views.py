@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
 from gcoinrpc import connect_to_remote
-from gcoinrpc.exceptions import InvalidParameter
+from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
 
 def get_rpc_connection():
@@ -35,5 +35,15 @@ class GetAssetInfoView(CsrfExemptMixin, View):
             return JsonResponse(response)
         except InvalidParameter:
             response = {'error': 'license color not exist'}
+            return JsonResponse(response, status=httplib.NOT_FOUND)
+
+class GetRawTransactionView(CsrfExemptMixin, View):
+    def get(self, request, tx_id, *args, **kwargs):
+        try:
+            rpc = get_rpc_connection()
+            response = rpc.getrawtransaction(tx_id)
+            return JsonResponse(response.__dict__)
+        except (InvalidParameter, InvalidAddressOrKey):
+            response = {'error': 'transaction not found'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
