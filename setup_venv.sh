@@ -12,7 +12,7 @@
 # check whether virtualenv is installed
 command -v virtualenv > /dev/null 2>&1 || { echo >&2 "virtualenv is not installed. Aborting."; exit 1;}
 
-virtualenv -p python3 env
-source env/bin/activate
-
-pip install -r requirements.txt
+if virtualenv -p python2.7 env; then
+    source env/bin/activate
+    pip install -r requirements.txt
+fi
