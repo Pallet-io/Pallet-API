@@ -1,4 +1,5 @@
 import httplib
+import logging
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -12,6 +13,8 @@ from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
 from .forms import RawTxForm
 from ..utils import balance_from_utxos, select_utxo
+
+logger = logging.getLogger(__name__)
 
 
 def get_rpc_connection():
@@ -95,6 +98,19 @@ class CreateRawTxView(View):
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+
+class SendRawTxView(CsrfExemptMixin, View):
+    def post(self, request, *args, **kwargs):
+        raw_tx = request.POST.get('raw_tx', '')
+        try:
+            tx_id = get_rpc_connection().sendrawtransaction(raw_tx)
+            response = {'tx_id': tx_id}
+            return JsonResponse(response)
+        except:
+            logger.error('Invalid transaction: %s', raw_tx, extra={'endpoint': request.path})
+            response = {'error': 'invalid raw transaction'}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
 
 
