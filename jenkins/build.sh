@@ -10,4 +10,5 @@ pip install -r jenkins/requirements.txt
 
 python oss_server/manage.py jenkins \
     --output-dir=jenkins/reports \
-    --settings=oss_server.settings.jenkins
+    --settings=oss_server.settings.jenkins \
+    --project-apps-tests
