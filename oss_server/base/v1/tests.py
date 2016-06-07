@@ -114,7 +114,8 @@ class GetRawTxTest(TestCase):
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_invalid_address_or_key(self, mock_rpc):
-        mock_rpc().getrawtransaction.side_effect = InvalidParameter({'code': -5, 'message': 'test invalid address or key'})
+        mock_rpc().getrawtransaction.side_effect = InvalidParameter({'code': -5,
+                                                                     'message': 'test invalid address or key'})
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
@@ -233,4 +234,29 @@ class CreateRawTxTest(TestCase):
 
     def test_missing_form_data(self):
         response = self.client.get(self.url, {})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+
+class SendRawTxTest(TestCase):
+    def setUp(self):
+        self.url = '/base/v1/transaction/send'
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_send_raw_tx(self, mock_rpc):
+        tx_id = 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15'
+        mock_rpc().sendrawtransaction.return_value = tx_id
+
+        response = self.client.post(self.url, {'raw_tx': 'aaaabbbbccccddddeeeeffff'})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json(), {'tx_id': tx_id})
+
+    def test_wrong_http_method(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, httplib.METHOD_NOT_ALLOWED)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_exception(self, mock_rpc):
+        mock_rpc().sendrawtransaction.side_effect = Exception()
+
+        response = self.client.post(self.url, {'raw_tx': ''})
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
