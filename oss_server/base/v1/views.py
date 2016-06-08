@@ -8,6 +8,7 @@ from django.views.generic import View
 
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
+from django.conf.urls import handler500
 
 
 def get_rpc_connection():
@@ -15,6 +16,11 @@ def get_rpc_connection():
                              settings.GCOIN_RPC['password'],
                              settings.GCOIN_RPC['host'],
                              settings.GCOIN_RPC['port'])
+
+
+def server_error(request):
+    response = {"error": "internal server error"}
+    return JsonResponse(response, status=httplib.INTERNAL_SERVER_ERROR)
 
 
 class CsrfExemptMixin(object):
@@ -47,4 +53,3 @@ class GetRawTransactionView(CsrfExemptMixin, View):
         except (InvalidParameter, InvalidAddressOrKey):
             response = {'error': 'transaction not found'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
-
