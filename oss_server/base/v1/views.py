@@ -53,3 +53,19 @@ class GetRawTransactionView(CsrfExemptMixin, View):
         except (InvalidParameter, InvalidAddressOrKey):
             response = {'error': 'transaction not found'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
+
+
+class GetBalanceView(CsrfExemptMixin, View):
+    def get(self, request, address, *args, **kwargs):
+        utxos = get_rpc_connection().gettxoutaddress(address)
+        balance_dict = self._count_balance_from_utxos(utxos)
+        return JsonResponse(balance_dict)
+
+    def _count_balance_from_utxos(self, utxos):
+        balance_dict = {}
+        if utxos:
+            for txout in utxos:
+                color = txout['color']
+                value = txout['value']
+                balance_dict[color] = (balance_dict.get(color) or 0) + value
+        return balance_dict
