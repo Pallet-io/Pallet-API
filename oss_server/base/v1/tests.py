@@ -119,3 +119,30 @@ class GetRawTransactionTest(TestCase):
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
+
+class GetBalanceTest(TestCase):
+    def setUp(self):
+        self.url = "/base/v1/balance/1NYbzjaq486dGjuXz1Kiu9L7PY6svgaDn7"
+        self.sample_txoutaddress = [{
+                                        "txid" : "tx_id", "vout" : 0, "color" : 1, "value" : 1
+                                    },
+                                    {
+                                        "txid" : "tx_id", "vout" : 1, "color" : 1, "value" : 998999
+                                    }]
+        self.sample_balance = {"1": 999000}
+        self.wrong_address_url = "/base/v1/balance/123321"
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_get_balance(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json(), self.sample_balance)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_get_wrong_address_balance(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = None
+        response = self.client.get(self.wrong_address_url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json(), {})
+
