@@ -6,9 +6,12 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
+from gcoin import make_raw_tx
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
-from django.conf.urls import handler500
+
+from .forms import RawTxForm
+from ..utils import balance_from_utxos, select_utxo
 
 
 def get_rpc_connection():
@@ -34,7 +37,7 @@ class CsrfExemptMixin(object):
         return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
 
 
-class GetLicenseInfoView(CsrfExemptMixin, View):
+class GetLicenseInfoView(View):
     def get(self, request, color_id, *args, **kwargs):
         try:
             response = get_rpc_connection().getlicenseinfo(int(color_id))
@@ -44,7 +47,7 @@ class GetLicenseInfoView(CsrfExemptMixin, View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetRawTransactionView(CsrfExemptMixin, View):
+class GetRawTransactionView(View):
     def get(self, request, tx_id, *args, **kwargs):
         try:
             rpc = get_rpc_connection()
@@ -55,17 +58,48 @@ class GetRawTransactionView(CsrfExemptMixin, View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetBalanceView(CsrfExemptMixin, View):
+class CreateRawTransactionView(View):
+    def get(self, request, *args, **kwargs):
+        form = RawTxForm(request.GET)
+        if form.is_valid():
+            from_address = form.cleaned_data['from_address']
+            to_address = form.cleaned_data['to_address']
+            color_id = form.cleaned_data['color_id']
+            amount = form.cleaned_data['amount']
+
+            utxos = get_rpc_connection().gettxoutaddress(from_address)
+            # Color 1 is used as fee, so here's special case for it.
+            if color_id == 1:
+                if not select_utxo(utxos, color_id, amount):
+                    return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+                inputs = select_utxo(utxos, color_id, amount + 1)
+                if not inputs:
+                    return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
+            else:
+                inputs = select_utxo(utxos, color_id, amount)
+                if not inputs:
+                    return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+                fee = select_utxo(utxos, 1, 1)
+                if not fee:
+                    return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
+                inputs += fee
+
+            # Calculate input value, and make a 'change' output.
+            inputs_value = balance_from_utxos(inputs)[color_id]
+            change = inputs_value - amount
+            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout']} for utxo in inputs]
+            outs = [{'address': to_address, 'value': amount, 'color': color_id},
+                    {'address': from_address, 'value': change, 'color': color_id}]
+            raw_tx = make_raw_tx(ins, outs)
+            return JsonResponse({'raw_tx': raw_tx})
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+
+class GetBalanceView(View):
     def get(self, request, address, *args, **kwargs):
         utxos = get_rpc_connection().gettxoutaddress(address)
-        balance_dict = self._count_balance_from_utxos(utxos)
+        balance_dict = balance_from_utxos(utxos)
         return JsonResponse(balance_dict)
-
-    def _count_balance_from_utxos(self, utxos):
-        balance_dict = {}
-        if utxos:
-            for txout in utxos:
-                color = txout['color']
-                value = txout['value']
-                balance_dict[color] = (balance_dict.get(color) or 0) + value
-        return balance_dict
