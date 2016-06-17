@@ -6,10 +6,10 @@ from gcoinrpc.data import TransactionInfo
 from gcoinrpc.exceptions import InvalidParameter
 
 
-class GetAssetInfoTest(TestCase):
+class GetLicenseInfoTest(TestCase):
     def setUp(self):
-        self.url = "/base/v1/asset/2"
-        self.sample_asset_info = {
+        self.url = "/base/v1/license/2"
+        self.sample_license_info = {
             "member_control": "false",
             "metadata_hash": "0000000000000000000000000000000000000000000000000000000000000000",
             "divisibility": "true",
@@ -26,20 +26,20 @@ class GetAssetInfoTest(TestCase):
         }
 
     @mock.patch('base.v1.views.get_rpc_connection')
-    def test_get_asset_info(self, mock_rpc):
-        mock_rpc().getassetinfo.return_value = self.sample_asset_info
+    def test_get_license_info(self, mock_rpc):
+        mock_rpc().getlicenseinfo.return_value = self.sample_license_info
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.OK)
-        self.assertEqual(response.json(), self.sample_asset_info)
+        self.assertEqual(response.json(), self.sample_license_info)
 
     def test_wrong_http_method(self):
         response = self.client.post(self.url)
         self.assertEqual(response.status_code, httplib.METHOD_NOT_ALLOWED)
 
     @mock.patch('base.v1.views.get_rpc_connection')
-    def test_asset_not_exist(self, mock_rpc):
-        mock_rpc().getassetinfo.side_effect = InvalidParameter({'code': -8, 'message': 'License color not exist.'})
+    def test_license_not_exist(self, mock_rpc):
+        mock_rpc().getlicenseinfo.side_effect = InvalidParameter({'code': -8, 'message': 'License color not exist.'})
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)

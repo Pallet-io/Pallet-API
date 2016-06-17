@@ -28,14 +28,15 @@ class CsrfExemptMixin(object):
         return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
 
 
-class GetAssetInfoView(CsrfExemptMixin, View):
+class GetLicenseInfoView(CsrfExemptMixin, View):
     def get(self, request, color_id, *args, **kwargs):
         try:
-            response = get_rpc_connection().getassetinfo(int(color_id))
+            response = get_rpc_connection().getlicenseinfo(int(color_id))
             return JsonResponse(response)
         except InvalidParameter:
             response = {'error': 'license color not exist'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
+
 
 class GetRawTransactionView(CsrfExemptMixin, View):
     def get(self, request, tx_id, *args, **kwargs):
