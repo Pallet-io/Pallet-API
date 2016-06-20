@@ -47,7 +47,7 @@ class GetLicenseInfoView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetRawTransactionView(View):
+class GetRawTxView(View):
     def get(self, request, tx_id, *args, **kwargs):
         try:
             rpc = get_rpc_connection()
@@ -58,7 +58,7 @@ class GetRawTransactionView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class CreateRawTransactionView(View):
+class CreateRawTxView(View):
     def get(self, request, *args, **kwargs):
         form = RawTxForm(request.GET)
         if form.is_valid():
