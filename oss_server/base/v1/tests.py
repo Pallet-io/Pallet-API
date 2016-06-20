@@ -45,7 +45,7 @@ class GetLicenseInfoTest(TestCase):
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
 
 
-class GetRawTransactionTest(TestCase):
+class GetRawTxTest(TestCase):
     def setUp(self):
         self.url = "/base/v1/transaction/c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e"
         sample_transaction = {
@@ -93,7 +93,6 @@ class GetRawTransactionTest(TestCase):
 
         self.sample_transaction = TransactionInfo(**sample_transaction)
 
-
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_get_raw_transaction(self, mock_rpc):
         mock_rpc().getrawtransaction.return_value = self.sample_transaction
@@ -120,14 +119,15 @@ class GetRawTransactionTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
 
+
 class GetBalanceTest(TestCase):
     def setUp(self):
         self.url = "/base/v1/balance/1NYbzjaq486dGjuXz1Kiu9L7PY6svgaDn7"
         self.sample_txoutaddress = [{
-                                        "txid" : "tx_id", "vout" : 0, "color" : 1, "value" : 1
+                                        "txid": "tx_id", "vout": 0, "color": 1, "value": 1
                                     },
                                     {
-                                        "txid" : "tx_id", "vout" : 1, "color" : 1, "value" : 998999
+                                        "txid": "tx_id", "vout": 1, "color": 1, "value": 998999
                                     }]
         self.sample_balance = {"1": 999000}
         self.wrong_address_url = "/base/v1/balance/123321"
@@ -146,3 +146,91 @@ class GetBalanceTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json(), {})
 
+
+class CreateRawTxTest(TestCase):
+    def setUp(self):
+        self.url = '/base/v1/transaction/create'
+        self.sample_txoutaddress = [
+            {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
+             'vout': 0,
+             'color': 1,
+             'value': 2},
+            {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
+             'vout': 0,
+             'color': 2,
+             'value': 10},
+        ]
+        self.sample_txoutaddress_without_fee = [
+            {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
+             'vout': 0,
+             'color': 2,
+             'value': 10},
+        ]
+        self.from_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
+        self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_using_color1(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 1,
+                                              'amount': 1})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_using_other_color(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 2,
+                                              'amount': 10})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+    # Test insufficient fee
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_with_color1_without_sufficient_fee(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 1,
+                                              'amount': 2})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient fee'})
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_with_color1_without_sufficient_fee(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress_without_fee
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 2,
+                                              'amount': 10})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient fee'})
+
+    # Test insufficient funds
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_with_color1_without_sufficient_funds(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 1,
+                                              'amount': 3})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient funds'})
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_with_color1_without_sufficient_funds(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 2,
+                                              'amount': 11})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient funds'})
+
+    def test_missing_form_data(self):
+        response = self.client.get(self.url, {})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
