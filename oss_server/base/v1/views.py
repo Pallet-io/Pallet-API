@@ -87,12 +87,25 @@ class CreateRawTxView(View):
                     return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
                 inputs += fee
 
-            # Calculate input value, and make a 'change' output.
-            inputs_value = balance_from_utxos(inputs)[color_id]
-            change = inputs_value - amount
             ins = [{'tx_id': utxo['txid'], 'index': utxo['vout']} for utxo in inputs]
-            outs = [{'address': to_address, 'value': int(amount * 1e8), 'color': color_id},
-                    {'address': from_address, 'value': int(change * 1e8), 'color': color_id}]
+            outs = [{'address': to_address, 'value': int(amount * 1e8), 'color': color_id}]
+            # Now for the `change` part.
+            if color_id == 1:
+                inputs_value = balance_from_utxos(inputs)[color_id]
+                change = inputs_value - amount - 1
+                if change:
+                    outs.append({'address': from_address, 'value': int(change * 10**8), 'color': color_id})
+            else:
+                inputs_value = balance_from_utxos(inputs)[color_id]
+                change = inputs_value - amount
+                if change:
+                    outs.append({'address': from_address, 'value': int(change * 10**8), 'color': color_id})
+                # Fee `change`.
+                fee_value = balance_from_utxos(inputs)[1]
+                fee_change = fee_value - 1
+                if fee_change:
+                    outs.append({'address': from_address, 'value': int(fee_change * 10**8), 'color': 1})
+
             raw_tx = make_raw_tx(ins, outs)
             return JsonResponse({'raw_tx': raw_tx})
         else:
