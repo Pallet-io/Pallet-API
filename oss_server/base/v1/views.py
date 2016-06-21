@@ -91,8 +91,8 @@ class CreateRawTxView(View):
             inputs_value = balance_from_utxos(inputs)[color_id]
             change = inputs_value - amount
             ins = [{'tx_id': utxo['txid'], 'index': utxo['vout']} for utxo in inputs]
-            outs = [{'address': to_address, 'value': amount, 'color': color_id},
-                    {'address': from_address, 'value': change, 'color': color_id}]
+            outs = [{'address': to_address, 'value': int(amount * 1e8), 'color': color_id},
+                    {'address': from_address, 'value': int(change * 1e8), 'color': color_id}]
             raw_tx = make_raw_tx(ins, outs)
             return JsonResponse({'raw_tx': raw_tx})
         else:
