@@ -232,6 +232,16 @@ class CreateRawTxTest(TestCase):
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
         self.assertEqual(response.json(), {'error': 'insufficient funds'})
 
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_with_amount_exceed_8_decimal_digit(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 1,
+                                              'amount': 0.123456789})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
+
     def test_missing_form_data(self):
         response = self.client.get(self.url, {})
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
