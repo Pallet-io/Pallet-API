@@ -16,11 +16,13 @@ class RawTxForm(forms.Form):
                                   error_messages={
                                       'required': '`color_id` is required',
                                       'invalid': '`color_id` is invalid',
-                                      'min_value': '`color_id` should be greater than 1'
+                                      'min_value': '`color_id` should be greater than 0'
                                   })
-    amount = forms.IntegerField(min_value=0,
+    amount = forms.DecimalField(min_value=0,
+                                decimal_places=8,
                                 error_messages={
                                     'required': '`amount` is required',
                                     'invalid': '`amount` is invalid',
-                                    'min_value': '`amount` should br greater than 1'
+                                    'min_value': '`amount` should be greater than 0',
+                                    'max_decimal_places': '`amount` only allow up to 8 decimal digits'
                                 })

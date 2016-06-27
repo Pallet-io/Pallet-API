@@ -88,7 +88,7 @@ class CreateRawTxView(View):
                 inputs += fee
 
             ins = [{'tx_id': utxo['txid'], 'index': utxo['vout']} for utxo in inputs]
-            outs = [{'address': to_address, 'value': int(amount * 1e8), 'color': color_id}]
+            outs = [{'address': to_address, 'value': int(amount * 10**8), 'color': color_id}]
             # Now for the `change` part.
             if color_id == 1:
                 inputs_value = balance_from_utxos(inputs)[color_id]
