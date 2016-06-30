@@ -155,17 +155,20 @@ class CreateRawTxTest(TestCase):
             {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
              'vout': 0,
              'color': 1,
-             'value': 2},
+             'value': 2,
+             'scriptPubKey': '2103dd5ed2dd68648b0a77a4a7f3e23c35e05f311e14e73a8012304f0e22ce3ae23fac'},
             {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
              'vout': 0,
              'color': 2,
-             'value': 10},
+             'value': 10,
+             'scriptPubKey': '76a914232e8540e8a3ff0b688854def11147970e7b6ce188ac'},
         ]
         self.sample_txoutaddress_without_fee = [
             {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
              'vout': 0,
              'color': 2,
-             'value': 10},
+             'value': 10,
+             'scriptPubKey': '76a914232e8540e8a3ff0b688854def11147970e7b6ce188ac'},
         ]
         self.from_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
         self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
