@@ -1,6 +1,32 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+
+class CreateLicenseInfoForm(forms.Form):
+    address = forms.RegexField(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
+                               error_messages={
+                                   'required': '`address` is required',
+                                   'invalid': '`address` is not an address'
+                               })
+    color_id = forms.IntegerField(error_messages={'required': '`color_id` is required'})
+    name = forms.CharField(max_length=32,
+                           error_messages={
+                               'required': '`name` is required',
+                               'max_length': 'length of `name` should not exceed 32'
+                           })
+    description = forms.CharField(max_length=40,
+                                  error_messages={
+                                      'required': '`description` is required',
+                                      'max_length': 'length of `description` should not exceed 40'
+                                  })
+    metadata_link = forms.CharField(max_length=255, required=False,
+                                    error_messages={
+                                        'max_length': 'length of `metadata_link` should not exceed 255'
+                                    })
+    member_control = forms.BooleanField(required=False,
+                                        error_messages={'required': '`member_control` is required'})
+
+
 class RawTxForm(forms.Form):
     from_address = forms.RegexField(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
                                     error_messages={
