@@ -87,7 +87,7 @@ class CreateRawTxView(View):
                     return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
                 inputs += fee
 
-            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout']} for utxo in inputs]
+            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout'], 'script': utxo['scriptPubKey']} for utxo in inputs]
             outs = [{'address': to_address, 'value': int(amount * 10**8), 'color': color_id}]
             # Now for the `change` part.
             if color_id == 1:
