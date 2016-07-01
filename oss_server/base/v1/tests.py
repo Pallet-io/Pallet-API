@@ -3,10 +3,11 @@ import mock
 
 from django.test import TestCase
 from gcoinrpc.data import TransactionInfo
-from gcoinrpc.exceptions import InvalidParameter
+from gcoinrpc.exceptions import InvalidParameter, WalletError
 
 
 class GetLicenseInfoTest(TestCase):
+
     def setUp(self):
         self.url = "/base/v1/license/2"
         self.sample_license_info = {
@@ -39,25 +40,27 @@ class GetLicenseInfoTest(TestCase):
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_license_not_exist(self, mock_rpc):
-        mock_rpc().getlicenseinfo.side_effect = InvalidParameter({'code': -8, 'message': 'License color not exist.'})
+        mock_rpc().getlicenseinfo.side_effect = InvalidParameter({'code': -8,
+                                                                  'message': 'License color not exist.'})
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
 
 
 class GetRawTxTest(TestCase):
+
     def setUp(self):
         self.url = "/base/v1/transaction/c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e"
         sample_transaction = {
             "vout": [{
                 "color": 0,
                 "scriptPubKey": {
-                        "reqSigs": 1,
-                        "hex": "2102958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1bac",
-                        "addresses": ["1A7R8nWmDv4DR7x2ZFyxPt4rBCc3ZBViQF"],
-                        "asm": "02958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1b OP_CHECKSIG",
-                        "type": "pubkey"
-                    },
+                    "reqSigs": 1,
+                    "hex": "2102958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1bac",
+                    "addresses": ["1A7R8nWmDv4DR7x2ZFyxPt4rBCc3ZBViQF"],
+                    "asm": "02958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1b OP_CHECKSIG",
+                    "type": "pubkey"
+                },
                 "value": 0,
                 "n": 0
             }],
@@ -78,7 +81,7 @@ class GetRawTxTest(TestCase):
                     "asm": "3045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c763c1e"
                            "7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a3201350"
                            "ce4f01"
-                    },
+                },
                 "sequence": 4294967295
             }],
             "txid": "c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e",
@@ -107,7 +110,8 @@ class GetRawTxTest(TestCase):
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_invalid_parameter(self, mock_rpc):
-        mock_rpc().getrawtransaction.side_effect = InvalidParameter({'code': -8, 'message': 'test invalid parameter'})
+        mock_rpc().getrawtransaction.side_effect = InvalidParameter({'code': -8,
+                                                                     'message': 'test invalid parameter'})
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
@@ -121,15 +125,69 @@ class GetRawTxTest(TestCase):
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
 
 
+class CreateLicenseInfoTest(TestCase):
+
+    def setUp(self):
+        self.url = '/base/v1/license/create'
+        self.sample_txid = {
+            'tx_id': '3481dbaf53ef3c56f0c0620b61b9d05c80473448f6a269d55d664f3e9385c951'}
+        self.sample_params = {'description': 'description', 'color_id': 1, 'name': 'name',
+                              'address': '16EBY8jTAaXo14hcU7syyMsoatwcNqD1Md', 'member_control': True}
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_license(self, mock_rpc):
+        mock_rpc().sendlicensetoaddress.return_value = self.sample_txid['tx_id']
+        response = self.client.get(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json(), self.sample_txid)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_miss_field_form(self, mock_rpc):
+        mock_rpc().sendlicensetoaddress.return_value = self.sample_txid['tx_id']
+        required_field = ['description', 'color_id', 'name', 'address']
+        for field in required_field:
+            miss_field_params = dict(self.sample_params)
+            del miss_field_params[field]
+            response = self.client.get(self.url, miss_field_params)
+            self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_wrong_len_field(self, mock_rpc):
+        mock_rpc().sendlicensetoaddress.return_value = self.sample_txid['tx_id']
+        field_max_len = {'name': 32, 'description': 40}
+        for field in field_max_len:
+            wrong_len_field_params = dict(self.sample_params)
+            wrong_len_field_params[field] = 'x' * (field_max_len[field] + 1)
+            response = self.client.get(self.url, wrong_len_field_params)
+            self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_not_enough_color_zero_coin(self, mock_rpc):
+        mock_rpc().sendlicensetoaddress.side_effect = WalletError({'code': -4,
+                                                                   'message': 'Insufficient LICENSE type funds'})
+        response = self.client.get(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_license_already_exists(self, mock_rpc):
+        mock_rpc().sendlicensetoaddress.side_effect = WalletError({'code': -4,
+                                                                   'message': 'License is already created'})
+        response = self.client.get(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+
 class GetBalanceTest(TestCase):
+
     def setUp(self):
         self.url = "/base/v1/balance/1NYbzjaq486dGjuXz1Kiu9L7PY6svgaDn7"
-        self.sample_txoutaddress = [{
-                                        "txid": "tx_id", "vout": 0, "color": 1, "value": 1
-                                    },
-                                    {
-                                        "txid": "tx_id", "vout": 1, "color": 1, "value": 998999
-                                    }]
+        self.sample_txoutaddress = [
+            {
+                "txid": "tx_id", "vout": 0, "color": 1, "value": 1
+            },
+            {
+                "txid": "tx_id", "vout": 1, "color": 1, "value": 998999
+            }
+        ]
         self.sample_balance = {"1": 999000}
         self.wrong_address_url = "/base/v1/balance/123321"
 
@@ -149,6 +207,7 @@ class GetBalanceTest(TestCase):
 
 
 class CreateRawTxTest(TestCase):
+
     def setUp(self):
         self.url = '/base/v1/transaction/create'
         self.sample_txoutaddress = [
@@ -251,6 +310,7 @@ class CreateRawTxTest(TestCase):
 
 
 class SendRawTxTest(TestCase):
+
     def setUp(self):
         self.url = '/base/v1/transaction/send'
 
