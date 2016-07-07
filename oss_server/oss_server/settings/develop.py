@@ -4,4 +4,5 @@ DEBUG = True
 
 INSTALLED_APPS += [
     'base',
+    'explorer',
 ]
