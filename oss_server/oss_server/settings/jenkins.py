@@ -2,11 +2,13 @@ from .base import *
 
 INSTALLED_APPS += (
     'base',
+    'explorer',
     'django_jenkins',
 )
 
 PROJECT_APPS = (
     'base',
+    'explorer',
 )
 
 JENKINS_TASKS = (
