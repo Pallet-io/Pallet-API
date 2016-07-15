@@ -75,8 +75,8 @@ class Block(models.Model):
 
 class Datadir(models.Model):
     dirname = models.CharField(max_length=2000)
-    blkfile_number = models.DecimalField(max_digits=8, decimal_places=0, blank=True, null=True)
-    blkfile_offset = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True)
+    blkfile_number = models.IntegerField(blank=True, null=True)
+    blkfile_offset = models.IntegerField(blank=True, null=True)
 
 
 class Tx(models.Model):
@@ -90,7 +90,7 @@ class Tx(models.Model):
         6: 'CANCEL',
     }
 
-    hash = models.CharField(unique=True, max_length=32)
+    hash = models.CharField(max_length=32)
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
