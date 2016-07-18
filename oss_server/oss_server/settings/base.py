@@ -68,6 +68,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'oss_server.wsgi.application'
 
 
+# Gcoin RPC
+
+GCOIN_RPC = {
+    'user': '<user>',
+    'password': '<passwrod>',
+    'host': '<host>',
+    'port': '<port>',
+}
+
+
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases
 
