@@ -7,11 +7,11 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
-from gcoin import make_raw_tx
+from gcoin import make_mint_raw_tx, make_raw_tx
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from .forms import RawTxForm
+from .forms import MintRawTxForm, RawTxForm
 from ..utils import balance_from_utxos, select_utxo
 
 logger = logging.getLogger(__name__)
@@ -132,3 +132,19 @@ class GetBalanceView(View):
         utxos = get_rpc_connection().gettxoutaddress(address)
         balance_dict = balance_from_utxos(utxos)
         return JsonResponse(balance_dict)
+
+
+class CreateMintRawTxView(View):
+    def get(self, request, *args, **kwargs):
+        form = MintRawTxForm(request.GET)
+        if form.is_valid():
+            mint_address = form.cleaned_data['mint_address']
+            color_id = form.cleaned_data['color_id']
+            amount = form.cleaned_data['amount']
+
+            raw_tx = make_mint_raw_tx(mint_address, color_id, int(amount * 10**8))
+            return JsonResponse({'raw_tx': raw_tx})
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)

@@ -273,3 +273,27 @@ class SendRawTxTest(TestCase):
 
         response = self.client.post(self.url, {'raw_tx': ''})
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+
+class CreateMintRawTxTest(TestCase):
+    def setUp(self):
+        self.url = '/base/v1/mint/create'
+        self.mint_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
+
+    def test_create_raw_tx_using_color1(self):
+        response = self.client.get(self.url, {'mint_address': self.mint_address,
+                                              'color_id': 1,
+                                              'amount': 1})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+    def test_create_raw_tx_with_amount_exceed_8_decimal_digit(self):
+        response = self.client.get(self.url, {'mint_address': self.mint_address,
+                                              'color_id': 1,
+                                              'amount': 0.123456789})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
+
+    def test_missing_form_data(self):
+        response = self.client.get(self.url, {})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
