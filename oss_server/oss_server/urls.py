@@ -22,4 +22,5 @@ handler500 = 'base.v1.views.server_error'
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^base/', include('base.urls', namespace='base')),
+    url(r'^explorer/', include('explorer.urls', namespace='explorer')),
 ]

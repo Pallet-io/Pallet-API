@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+from collections import OrderedDict
+
 from django.db import models
 
 
@@ -22,6 +24,9 @@ class Block(models.Model):
     chain_work = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True)
     tx_count = models.DecimalField(max_digits=10, decimal_places=0)
 
+    class Meta:
+        ordering = ['-time']
+
     @property
     def confirmation(self):
         # orphan
@@ -31,6 +36,40 @@ class Block(models.Model):
         else:
             max_height = Block.objects.filter(in_longest=1).count()
             return int(max_height - self.height) + 1
+
+    @property
+    def branch(self):
+        return 'main' if self.in_longest else 'orphan'
+
+    @property
+    def prev_block_hash(self):
+        return self.prev_block.hash if self.prev_block else None
+
+    @property
+    def next_block_hashes(self):
+        return [block.hash for block in self.next_blocks.all()]
+
+    @property
+    def transaction_hashes(self):
+        return [tx.hash for tx in self.txs.all()]
+
+    def as_dict(self):
+        return OrderedDict([
+            ('hash', self.hash),
+            ('height', self.height),
+            ('previous_block_hash', self.prev_block_hash),
+            ('next_blocks', self.next_block_hashes),
+            ('merkle_root', self.merkle_root),
+            ('time', self.time),
+            ('bits', self.bits),
+            ('nonce', self.nonce),
+            ('version', self.version),
+            ('branch', self.branch),
+            ('size', self.size),
+            ('chain_work', self.chain_work),
+            ('transaction_count', self.tx_count),
+            ('transaction_hashes', self.transaction_hashes),
+        ])
 
 
 class Datadir(models.Model):
