@@ -1,3 +1,4 @@
+import binascii
 import httplib
 import random
 
@@ -45,7 +46,8 @@ class GetBlockByHashTest(TestCase):
         url = '/explorer/v1/blocks/00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
-        self.assertEqual(response.json()['block']['hash'], '00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b')
+        self.assertEqual(response.json()['block']['hash'],
+                         '00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b')
 
     def test_block_not_found(self):
         url = '/explorer/v1/blocks/00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3c'
@@ -77,3 +79,90 @@ class GetBlockByHeightTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
         self.assertEqual(response.json(), {'error': 'block not exist'})
+
+
+class GetTxByHashTest(TestCase):
+    def setUp(self):
+        """
+        block1:
+            tx1:
+                type: coinbase tx
+                addr: address1
+        block2:
+            tx2:
+                type: coinbase tx
+                addr: address1
+            tx3:
+                type: mint tx
+                addr: address1
+                value: 100
+            tx4:
+                type: normal tx from address1 to address2
+                addr: address1, address2
+                value: 89, 10
+        """
+        self.address1 = Address.objects.create(address='126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+        self.baseScriptPubKey = '21036bbb2d3974e203d6f89c30ab17f05e7bd3580954c5198875f235d292e00fdbeaac'
+        self.mintScriptPubKey = '76a9140c0a86d78bc3f71db1f969353da4769e2084bc5988ac'
+        self.address2 = Address.objects.create(address='13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
+        self.block1 = Block.objects.create(hash='000004e0223a146664188edebf7efbce82c3a421ce70f30b71c156368c21caaf',
+                                           height=0, tx_count=1, in_longest=1)
+        self.block2 = Block.objects.create(hash='00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b',
+                                           height=1, prev_block=self.block1, tx_count=1, in_longest=1)
+        self.tx1 = self.createCoinbaseTx('7e336fb514f829b57b5147f1d81abb35f7f08ebd97ef8e8063f2cfdf3ed2ca07',
+                                         self.block1)
+        self.tx2 = self.createCoinbaseTx('c0daefcf66be12f4e3f426c8b08babf437d7945e70bacee492df2c4a04b801e1',
+                                         self.block2)
+        self.tx3 = self.createMintTx('d562f957f68be51e11f7ffd1964df48dc55fdfed1357e51034990b8504fddccb', self.block2,
+                                     10000000000)
+        self.tx4 = self.createNormalTx('2e75d6117852fb0f3a42951a683cf9ab52f2b7d7578f5ac0487c2256aa301769', self.block2,
+                                       1000000000, '76a91419349e6f4108e9a387cbd0c090e445610e1449ec88ac', 8900000000)
+
+    def createCoinbaseTx(self, hash, block):
+        tx = Tx.objects.create(hash=hash, block=block, version=1, type=0)
+        TxIn.objects.create(tx=tx, position=0)
+        TxOut.objects.create(tx=tx, value=0, position=0, scriptpubkey=binascii.unhexlify(self.baseScriptPubKey),
+                             address=self.address1, spent=0, color=0)
+        return tx
+
+    def createMintTx(self, hash, block, value):
+        tx = Tx.objects.create(hash=hash, block=block, version=1, type=1)
+        TxIn.objects.create(tx=tx, position=0)
+        # `spent = 1` because tx4 would spend this txout
+        TxOut.objects.create(tx=tx, value=value, position=0, scriptpubkey=binascii.unhexlify(self.mintScriptPubKey),
+                             address=self.address1, spent=1, color=1)
+        return tx
+
+    def createNormalTx(self, hash, block, value, scripPubKey, change):
+        tx = Tx.objects.create(hash=hash, block=block, version=1, type=0)
+        TxIn.objects.create(tx=tx, txout=self.tx3.tx_outs.all()[0], position=0)
+        TxOut.objects.create(tx=tx, value=value, position=0, scriptpubkey=binascii.unhexlify(scripPubKey),
+                             address=self.address2, spent=0, color=1)
+        TxOut.objects.create(tx=tx, value=change, position=1, scriptpubkey=binascii.unhexlify(self.baseScriptPubKey),
+                             address=self.address1, spent=0, color=1)
+        return tx
+
+    def test_get_tx_by_hash(self):
+        # mint tx
+        url = '/explorer/v1/transactions/d562f957f68be51e11f7ffd1964df48dc55fdfed1357e51034990b8504fddccb'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json()['tx']['hash'],
+                         'd562f957f68be51e11f7ffd1964df48dc55fdfed1357e51034990b8504fddccb')
+        self.assertEqual(response.json()['tx']['block_hash'], self.block2.hash)
+        self.assertEqual(response.json()['tx']['type'], 'MINT')
+
+        # normal tx
+        url = '/explorer/v1/transactions/2e75d6117852fb0f3a42951a683cf9ab52f2b7d7578f5ac0487c2256aa301769'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json()['tx']['hash'],
+                         '2e75d6117852fb0f3a42951a683cf9ab52f2b7d7578f5ac0487c2256aa301769')
+        self.assertEqual(response.json()['tx']['block_hash'], self.block2.hash)
+        self.assertEqual(len(response.json()['tx']['vouts']), 2)
+
+    def test_tx_not_found(self):
+        url = '/explorer/v1/transactions/d562f957f68be51e11f7ffd1964df48dc55fdfed1357e51034990b8504fddc00'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.NOT_FOUND)
+        self.assertEqual(response.json(), {'error': 'tx not exist'})

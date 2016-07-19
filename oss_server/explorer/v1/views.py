@@ -13,7 +13,7 @@ class GetLatestBlocksView(View):
         return JsonResponse(response)
 
 
-class GetBlockByHash(View):
+class GetBlockByHashView(View):
     def get(self, request, block_hash):
         try:
             response = {'block': Block.objects.get(hash=block_hash).as_dict()}
@@ -23,7 +23,7 @@ class GetBlockByHash(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetBlockByHeight(View):
+class GetBlockByHeightView(View):
     def get(self, request, block_height):
         try:
             response = {'block': Block.objects.get(height=block_height, in_longest=1).as_dict()}
@@ -32,3 +32,12 @@ class GetBlockByHeight(View):
             response = {'error': 'block not exist'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
+
+class GetTxByHashView(View):
+    def get(self, request, tx_hash):
+        try:
+            response = {'tx': Tx.objects.get(hash=tx_hash).as_dict()}
+            return JsonResponse(response)
+        except Tx.DoesNotExist:
+            response = {'error': 'tx not exist'}
+            return JsonResponse(response, status=httplib.NOT_FOUND)
