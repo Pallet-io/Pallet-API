@@ -18,9 +18,13 @@ def select_utxo(utxos, color, sum):
         color: The color to filter.
         sum: The sum of the returned utxos' total value.
 
-    Returns: A list of utxo with value add up to `sum`. If the given utxo can't add up to `sum`, None is returned. This
-             function returns as many utxo as possible, that is, utxo with small value will get picked first.
+    Returns: A list of utxo with value add up to `sum`. If the given utxo can't add up to `sum`,
+             an empty list is returned. This function returns as many utxo as possible, that is,
+             utxo with small value will get picked first.
     """
+    if not utxos:
+        return []
+
     utxos = [utxo for utxo in utxos if utxo['color'] == color]
     utxos = sorted(utxos, key=lambda utxo: utxo['value'])
 
@@ -29,7 +33,7 @@ def select_utxo(utxos, color, sum):
         value += utxo['value']
         if value >= sum:
             return utxos[:i+1]
-    return None
+    return []
 
 
 def balance_from_utxos(utxos):
