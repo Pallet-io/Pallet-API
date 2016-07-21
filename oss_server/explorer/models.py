@@ -96,7 +96,7 @@ class Tx(models.Model):
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     type = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     size = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
-    time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True)
+    time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True, db_index=True)
 
     def as_dict(self):
         return OrderedDict([
@@ -141,6 +141,6 @@ class TxIn(models.Model):
         return OrderedDict([
             ('tx_id', self.txout.tx.hash if self.txout else None),
             ('vout', self.txout.position if self.txout else 0),
-            ('scriptsig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
+            ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
         ])
