@@ -7,11 +7,11 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
-from gcoin import make_mint_raw_tx, make_raw_tx
+from gcoin import encode_license, make_mint_raw_tx, make_raw_tx
 from gcoinrpc import connect_to_remote
-from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
+from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter, WalletError
 
-from .forms import MintRawTxForm, RawTxForm
+from .forms import CreateLicenseInfoForm, MintRawTxForm, RawTxForm
 from ..utils import balance_from_utxos, select_utxo
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ class CsrfExemptMixin(object):
 
 
 class GetLicenseInfoView(View):
+
     def get(self, request, color_id, *args, **kwargs):
         try:
             response = get_rpc_connection().getlicenseinfo(int(color_id))
@@ -50,7 +51,72 @@ class GetLicenseInfoView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
+class CreateLicenseInfoView(View):
+
+    def __init__(self):
+        super(CreateLicenseInfoView, self).__init__()
+        self._rpc = get_rpc_connection()
+
+    def get(self, request):
+        """
+        Before calling this method, make sure gcoin has already been minted some color 0 coins in advance.
+        This preparation needs to be done only once. The used coin would be refilled when a license is created.
+        """
+        form = CreateLicenseInfoForm(request.GET)
+        if form.is_valid():
+            address = form.cleaned_data['address']
+            color_id = form.cleaned_data['color_id']
+            license_hex = self._get_license_hex_from_cleaned_data(form.cleaned_data)
+            response, status = self._send_license_to_address(address, color_id, license_hex)
+
+            if status == httplib.OK:
+                self._refill_color_zero_coin()
+
+            return JsonResponse(response, status=status)
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+    def _refill_color_zero_coin(self):
+        # Each time a license is sent to an address, one color 0 coin will be consumed,
+        # so we replenish one here.
+        self._rpc.mint(1, 0)
+
+    def _send_license_to_address(self, address, color_id, license_hex):
+        try:
+            tx_id = self._rpc.sendlicensetoaddress(address, color_id, license_hex)
+            response = {'tx_id': tx_id}
+            status = httplib.OK
+        except WalletError as e:
+            if e.message == 'Insufficient LICENSE type funds':
+                logger.error('Invalid SendLicenseToAddress', extra=e.__dict__)
+                response = {'error': 'require `color 0` to create a license'}
+                status = httplib.BAD_REQUEST
+            elif 'License is already created' in e.message:
+                logger.error('Invalid SendLicenseToAddress', extra=e.__dict__)
+                response = {'error': 'license with `color_id` is already created'}
+                status = httplib.BAD_REQUEST
+            else:
+                raise e
+
+        return response, status
+
+    def _get_license_hex_from_cleaned_data(self, cleaned_data):
+        license = {
+            'name': cleaned_data['name'],
+            'description': cleaned_data['description'],
+            'issuer': 'none',
+            'fee_collector': 'none',
+            'member_control': cleaned_data['member_control'],
+            'metadata_link': cleaned_data['metadata_link'],
+        }
+
+        return encode_license(license)
+
+
 class GetRawTxView(View):
+
     def get(self, request, tx_id, *args, **kwargs):
         try:
             rpc = get_rpc_connection()
@@ -62,6 +128,7 @@ class GetRawTxView(View):
 
 
 class CreateRawTxView(View):
+
     def get(self, request, *args, **kwargs):
         form = RawTxForm(request.GET)
         if form.is_valid():
@@ -115,6 +182,7 @@ class CreateRawTxView(View):
 
 
 class SendRawTxView(CsrfExemptMixin, View):
+
     def post(self, request, *args, **kwargs):
         raw_tx = request.POST.get('raw_tx', '')
         try:
@@ -128,6 +196,7 @@ class SendRawTxView(CsrfExemptMixin, View):
 
 
 class GetBalanceView(View):
+
     def get(self, request, address, *args, **kwargs):
         utxos = get_rpc_connection().gettxoutaddress(address)
         balance_dict = balance_from_utxos(utxos)
