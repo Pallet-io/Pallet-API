@@ -222,7 +222,7 @@ class txOutput:
 
     @property
     def address(self):
-        return publicKeyDecode(hashStr(self.pubkey))
+        return pubkeyToAddress(hashStr(self.pubkey))
 
     def toString(self):
         print "--------------TX OUT------------------------"
