@@ -9,7 +9,9 @@ class AddressAdmin(admin.ModelAdmin):
 
 @admin.register(Block)
 class BlockAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('hash', 'height', 'in_longest')
+    list_filter = ('in_longest',)
+    search_fields = ('hash', '=height')
 
 
 @admin.register(Datadir)

@@ -9,13 +9,16 @@ from django.db import models
 class Address(models.Model):
     address = models.CharField(unique=True, max_length=40)
 
+    def __str__(self):
+        return '%s' % self.address
+
 
 class Block(models.Model):
-    hash = models.CharField(unique=True, max_length=32)
+    hash = models.CharField(unique=True, max_length=64)
     height = models.DecimalField(max_digits=14, decimal_places=0, blank=True, null=True)
     prev_block = models.ForeignKey('self', blank=True, null=True,
                                    related_name='next_blocks', related_query_name='next_block')
-    merkle_root = models.CharField(max_length=32, blank=True, null=True)
+    merkle_root = models.CharField(max_length=64, blank=True, null=True)
     time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True)
     bits = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     nonce = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
@@ -27,6 +30,9 @@ class Block(models.Model):
 
     class Meta:
         ordering = ['-time']
+
+    def __str__(self):
+        return '%s' % self.hash
 
     @property
     def confirmation(self):
@@ -77,6 +83,8 @@ class Datadir(models.Model):
     dirname = models.CharField(max_length=2000)
     blkfile_number = models.IntegerField(blank=True, null=True)
     blkfile_offset = models.IntegerField(blank=True, null=True)
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
 
 
 class Tx(models.Model):
@@ -90,7 +98,7 @@ class Tx(models.Model):
         6: 'CANCEL',
     }
 
-    hash = models.CharField(max_length=32)
+    hash = models.CharField(max_length=64)
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
@@ -109,6 +117,9 @@ class Tx(models.Model):
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
             ('vouts', [vout.as_dict() for vout in self.tx_outs.all()]),
         ])
+
+    def __str__(self):
+        return '%s' % self.hash
 
 
 class TxOut(models.Model):

@@ -1,6 +1,7 @@
 import binascii
 import hashlib
 import struct
+import re
 
 import base58
 
@@ -46,12 +47,22 @@ def hashStrLE(bytebuffer):
 def intLE(num):
     return struct.pack("<i", (num) % 2**32).encode('hex')
 
-def publicKeyDecode(pub):
-    pub = pub[2: -2]
-    hash1 = hashlib.sha256(binascii.unhexlify(pub))
-    hash2 = hashlib.new('ripemd160', hash1.digest())
-    padded = (b'\x00') + hash2.digest()
-    hash3 = hashlib.sha256(padded)
-    hash4 = hashlib.sha256(hash3.digest())
-    padded += hash4.digest()[:4]
+def pubkeyToAddress(pubkey):
+    pubkey = pubkey.lower()
+    # pay to pubkey hash
+    if re.match(r'^76a914[a-f0-9]{40}88ac$', pubkey):
+        pubkey = pubkey[6:-4]
+        pubkeyHash = binascii.unhexlify(pubkey)
+    # pay to pubkey
+    elif re.match(r'^21[a-f0-9]{66}ac$', pubkey):
+        pubkey = pubkey[2:-2]
+        hash1 = hashlib.sha256(binascii.unhexlify(pubkey))
+        pubkeyHash = hashlib.new('ripemd160', hash1.digest()).digest()
+    else:
+        return ''
+
+    padded = (b'\x00') + pubkeyHash
+    hash2 = hashlib.sha256(padded)
+    hash3 = hashlib.sha256(hash2.digest())
+    padded += hash3.digest()[:4]
     return base58.b58encode(padded)
