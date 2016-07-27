@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import binascii
 from collections import OrderedDict
 
 from django.db import models
@@ -95,7 +96,19 @@ class Tx(models.Model):
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     type = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     size = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
-    time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True)
+    time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True, db_index=True)
+
+    def as_dict(self):
+        return OrderedDict([
+            ('hash', self.hash),
+            ('block_hash', self.block.hash),
+            ('version', self.version),
+            ('locktime', self.locktime),
+            ('type', self.TX_TYPE[int(self.type)]),
+            ('time', self.time),
+            ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
+            ('vouts', [vout.as_dict() for vout in self.tx_outs.all()]),
+        ])
 
 
 class TxOut(models.Model):
@@ -107,11 +120,27 @@ class TxOut(models.Model):
     spent = models.DecimalField(max_digits=1, decimal_places=0, blank=True, null=True)
     color = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
+    def as_dict(self):
+        return OrderedDict([
+            ('n', self.position),
+            ('address', self.address.address),
+            ('scriptPubKey', binascii.hexlify(self.scriptpubkey)),
+            ('color', self.color),
+            ('amount', self.value),
+        ])
+
 
 class TxIn(models.Model):
     tx = models.ForeignKey(Tx, related_name='tx_ins', related_query_name='tx_in')
-    txout = models.ForeignKey(TxOut, related_name='tx_ins', related_query_name='tx_in')
+    txout = models.ForeignKey(TxOut, related_name='tx_ins', related_query_name='tx_in', blank=True, null=True)
     position = models.DecimalField(max_digits=10, decimal_places=0)
     scriptsig = models.BinaryField(blank=True, null=True)
     sequence = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
+    def as_dict(self):
+        return OrderedDict([
+            ('tx_id', self.txout.tx.hash if self.txout else None),
+            ('vout', self.txout.position if self.txout else 0),
+            ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
+            ('sequence', self.sequence),
+        ])
