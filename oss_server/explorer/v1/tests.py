@@ -7,7 +7,7 @@ from django.test import TestCase
 from ..models import *
 
 
-class TestSetUp:
+class TestSetUp(object):
     def __init__(self):
         self.address1, created = Address.objects.get_or_create(address='126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
         self.address2, created = Address.objects.get_or_create(address='13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
@@ -340,6 +340,173 @@ class GetColorTxsTest(TestCase):
 
     def test_tx_not_found(self):
         url = '/explorer/v1/transactions/color/1?starting_after=abc'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.NOT_FOUND)
+        self.assertEqual(response.json(), {'error': 'tx not exist'})
+
+
+class GetAddressTxsTest(TestCase):
+    def setUp(self):
+        """
+        block1:
+            txs[0:30]:
+                address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB
+                type: MINT
+                color: 1
+            txs[31:60]:
+                address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB
+                type: MINT
+                color: 2
+            txs[61:90]:
+                address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB, 13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx
+                type: NORMAL
+                color: 1
+        block2:
+            txs[91:120]:
+                address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB, 13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx
+                type: NORMAL
+                color: 2
+        """
+        test_sample = TestSetUp()
+        self.address1 = test_sample.address1
+        self.address2 = test_sample.address2
+        self.block1 = test_sample.create_block('000004e0223a146664188edebf7efbce82c3a421ce70f30b71c156368c21caaf', 0, 1,
+                                               None, 90, 1)
+        self.block2 = test_sample.create_block('00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b', 1, 2,
+                                               self.block1, 90, 1)
+
+        txs = []
+        for i in range(30):
+            txs.append(test_sample.create_mint_tx(str(i), self.block1, 1, i))
+        for i in range(30, 60):
+            txs.append(test_sample.create_mint_tx(str(i), self.block1, 2, i))
+        for i in range(60, 90):
+            txs.append(test_sample.create_normal_tx(str(i), self.block1, txs[i - 60].tx_outs.all()[0], 1, i))
+        for i in range(90, 120):
+            txs.append(test_sample.create_normal_tx(str(i), self.block2, txs[i - 60].tx_outs.all()[0], 2, i))
+
+    def test_get_address_txs(self):
+        # address: 13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx
+        # default page
+        url = '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 50)
+        self.assertEqual(response.json()['page']['starting_after'], '119')
+        self.assertEqual(response.json()['page']['ending_before'], '70')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx?starting_after=70')
+        for i in range(50):
+            self.assertEqual(response.json()['txs'][i]['vouts'][0]['address'], '13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
+
+        # a new tx should not affect the next page query
+        tx = Tx.objects.create(hash='1234', block=self.block1, version=1, type=1)
+        TxIn.objects.create(tx=tx, position=0)
+        TxOut.objects.create(tx=tx, value=100, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
+                             address=self.address1, spent=0, color=1)
+
+        # second page
+        url = response.json()['page']['next_uri']
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 10)
+        self.assertEqual(response.json()['page']['starting_after'], '69')
+        self.assertEqual(response.json()['page']['ending_before'], '60')
+        self.assertEqual(response.json()['page']['next_uri'], None)
+        for i in range(10):
+            self.assertEqual(response.json()['txs'][i]['vouts'][0]['address'], '13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
+
+        # address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB
+        # default page
+        url = '/explorer/v1/transactions/address/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 50)
+        self.assertEqual(response.json()['page']['starting_after'], '119')
+        self.assertEqual(response.json()['page']['ending_before'], '70')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         '/explorer/v1/transactions/address/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB?starting_after=70')
+        for i in range(50):
+            self.assertEqual(response.json()['txs'][i]['vouts'][1]['address'], '126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+
+        # a new tx should not affect the next page query
+        tx = Tx.objects.create(hash='4321', block=self.block1, version=1, type=1)
+        TxIn.objects.create(tx=tx, position=0)
+        TxOut.objects.create(tx=tx, value=100, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
+                             address=self.address1, spent=0, color=1)
+
+        # second page
+        url = response.json()['page']['next_uri']
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 50)
+        self.assertEqual(response.json()['page']['starting_after'], '69')
+        self.assertEqual(response.json()['page']['ending_before'], '20')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         '/explorer/v1/transactions/address/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB?starting_after=20')
+        for i in range(10):
+            self.assertEqual(response.json()['txs'][i]['vouts'][1]['address'], '126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+        for i in range(10, 50):
+            self.assertEqual(response.json()['txs'][i]['vouts'][0]['address'], '126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+
+    def test_page_with_param(self):
+        # page with param
+        url = '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx?starting_after=80'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 20)
+        self.assertEqual(response.json()['page']['starting_after'], '79')
+        self.assertEqual(response.json()['page']['ending_before'], '60')
+        self.assertEqual(response.json()['page']['next_uri'], None)
+        for i in range(20):
+            self.assertEqual(response.json()['txs'][i]['vouts'][0]['address'], '13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
+
+        url = '/explorer/v1/transactions/address/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB?starting_after=80'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 50)
+        self.assertEqual(response.json()['page']['starting_after'], '79')
+        self.assertEqual(response.json()['page']['ending_before'], '30')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         '/explorer/v1/transactions/address/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB?starting_after=30')
+        for i in range(20):
+            self.assertEqual(response.json()['txs'][i]['vouts'][1]['address'], '126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+        for i in range(20, 50):
+            self.assertEqual(response.json()['txs'][i]['vouts'][0]['address'], '126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+
+        # empty page
+        url = '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx?starting_after=0'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 0)
+        self.assertEqual(response.json()['page']['starting_after'], None)
+        self.assertEqual(response.json()['page']['ending_before'], None)
+        self.assertEqual(response.json()['page']['next_uri'], None)
+
+    def test_address_without_tx(self):
+        url = '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcaa'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 0)
+        self.assertEqual(response.json()['page']['starting_after'], None)
+        self.assertEqual(response.json()['page']['ending_before'], None)
+        self.assertEqual(response.json()['page']['next_uri'], None)
+
+        url = '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcaa?starting_after=10'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 0)
+        self.assertEqual(response.json()['page']['starting_after'], None)
+        self.assertEqual(response.json()['page']['ending_before'], None)
+        self.assertEqual(response.json()['page']['next_uri'], None)
+
+    def test_tx_not_found(self):
+        url = '/explorer/v1/transactions/address/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx?starting_after=abc'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.NOT_FOUND)
+        self.assertEqual(response.json(), {'error': 'tx not exist'})
+
+        url = '/explorer/v1/transactions/address/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB?starting_after=abc'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
         self.assertEqual(response.json(), {'error': 'tx not exist'})
