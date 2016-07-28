@@ -9,8 +9,8 @@ from ..models import *
 
 class TestSetUp:
     def __init__(self):
-        self.address1 = Address.objects.create(address='126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
-        self.address2 = Address.objects.create(address='13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
+        self.address1, created = Address.objects.get_or_create(address='126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB')
+        self.address2, created = Address.objects.get_or_create(address='13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx')
 
     def create_block(self, hash, time, height, prev_block, tx_count, in_longest):
         if prev_block:
