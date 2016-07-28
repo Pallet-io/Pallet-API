@@ -1,0 +1,2 @@
+class TxNotFoundException(Exception):
+    pass
