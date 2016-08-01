@@ -385,6 +385,10 @@ class GetAddressTxsTest(TestCase):
         for i in range(90, 120):
             txs.append(test_sample.create_normal_tx(str(i), self.block2, txs[i - 60].tx_outs.all()[0], 2, i))
 
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
+
     def test_get_address_txs(self):
         # address: 13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx
         # default page
