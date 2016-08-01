@@ -87,3 +87,23 @@ class GetAddressTxsView(View):
             'txs': [tx.as_dict() for tx in txs]
         }
         return JsonResponse(response)
+
+
+class GetAddressBalanceView(View):
+    def get(self, request, address):
+        utxo_list = TxOut.objects.filter(address__address=address, spent=0)
+
+        response = {}
+        for utxo in utxo_list:
+            color = int(utxo.color)
+            value = utxo.value
+            response[color] = response.get(color, 0) + value
+        return JsonResponse(response)
+
+
+class GetAddressUtxoView(View):
+    def get(self, request, address):
+        utxo_list = TxOut.objects.filter(address__address=address, spent=0)
+
+        response = {'utxo': [utxo.utxo_dict() for utxo in utxo_list]}
+        return JsonResponse(response)

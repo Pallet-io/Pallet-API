@@ -514,3 +514,123 @@ class GetAddressTxsTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
         self.assertEqual(response.json(), {'error': 'tx not exist'})
+
+
+class GetAddressUtxoAndBalanceTest(TestCase):
+    def setUp(self):
+        """
+            block1:
+                txs[0:30]:
+                    address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB
+                    type: MINT
+                    color: 1
+                    value: 100
+                txs[31:60]:
+                    address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB
+                    type: MINT
+                    color: 2
+                    value: 100
+                txs[61:80]:
+                    address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB, 13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx
+                    type: NORMAL
+                    color: 1
+                    value: 80, 10, 10
+            block2: (fork)
+                txs[81:100]:
+                    address: 126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB, 13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx
+                    type: NORMAL
+                    color: 2
+                    value: 80, 10, 10
+        """
+        test_sample = TestSetUp()
+        self.address1 = test_sample.address1
+        self.address2 = test_sample.address2
+        self.block1 = test_sample.create_block('000004e0223a146664188edebf7efbce82c3a421ce70f30b71c156368c21caaf', 0, 1,
+                                               None, 80, 1)
+        self.block2 = test_sample.create_block('00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b', 1, 2,
+                                               None, 20, 0)
+
+        txs = []
+        for i in range(30):
+            txs.append(test_sample.create_mint_tx(str(i), self.block1, 1, i))
+        for i in range(30, 60):
+            txs.append(test_sample.create_mint_tx(str(i), self.block1, 2, i))
+        for i in range(60, 80):
+            # spend txs[0:20]
+            tx = Tx.objects.create(hash=str(i), block=self.block1, version=1, type=0, time=i)
+            txout = txs[i - 60].tx_outs.all()[0]
+            TxIn.objects.create(tx=tx, txout=txout, position=0)
+            TxOut.objects.create(tx=tx, value=10, position=1, scriptpubkey=binascii.unhexlify('aaaa'),
+                                 address=self.address2, spent=0, color=1)
+            TxOut.objects.create(tx=tx, value=10, position=2, scriptpubkey=binascii.unhexlify('aaaa'),
+                                 address=self.address2, spent=0, color=1)
+            TxOut.objects.create(tx=tx, value=80, position=0, scriptpubkey=binascii.unhexlify('bbbb'),
+                                 address=self.address1, spent=0, color=1)
+            txout.spent = 1
+            txout.save()
+        for i in range(80, 100):
+            # txs in fork block
+            tx = Tx.objects.create(hash=str(i), block=self.block2, version=1, type=0, time=i)
+            txout = txs[i - 50].tx_outs.all()[0]
+            TxIn.objects.create(tx=tx, txout=txout, position=0)
+            TxOut.objects.create(tx=tx, value=10, position=1, scriptpubkey=binascii.unhexlify('aaaa'),
+                                 address=self.address2, spent=None, color=2)
+            TxOut.objects.create(tx=tx, value=10, position=2, scriptpubkey=binascii.unhexlify('aaaa'),
+                                 address=self.address2, spent=None, color=2)
+            TxOut.objects.create(tx=tx, value=80, position=0, scriptpubkey=binascii.unhexlify('bbbb'),
+                                 address=self.address1, spent=None, color=2)
+
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
+
+    def test_get_address_utxo(self):
+        url = '/explorer/v1/addresses/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB/utxos'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['utxo']), 60)
+        for i in range(10):
+            self.assertEqual(int(response.json()['utxo'][i]['color']), 1)
+            self.assertEqual(int(response.json()['utxo'][i]['value']), 100)
+            self.assertEqual(response.json()['utxo'][i]['tx'], str(i + 20))
+        for i in range(10, 40):
+            self.assertEqual(int(response.json()['utxo'][i]['color']), 2)
+            self.assertEqual(int(response.json()['utxo'][i]['value']), 100)
+            self.assertEqual(response.json()['utxo'][i]['tx'], str(i + 20))
+        for i in range(40, 60):
+            self.assertEqual(int(response.json()['utxo'][i]['color']), 1)
+            self.assertEqual(int(response.json()['utxo'][i]['value']), 80)
+            self.assertEqual(response.json()['utxo'][i]['tx'], str(i + 20))
+
+        url = '/explorer/v1/addresses/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx/utxos'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['utxo']), 40)
+        for i in range(40):
+            self.assertEqual(int(response.json()['utxo'][i]['color']), 1)
+            self.assertEqual(int(response.json()['utxo'][i]['value']), 10)
+            self.assertEqual(response.json()['utxo'][i]['tx'], str(i / 2 + 60))
+
+    def test_address_no_ntux(self):
+        url = '/explorer/v1/addresses/126fiiHJY4PCba1NXoPpSSo3kHpZmGYaaa/utxos'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['utxo']), 0)
+
+    def test_get_address_balance(self):
+        url = '/explorer/v1/addresses/126fiiHJY4PCba1NXoPpSSo3kHpZmGYiHB/balance'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(int(response.json().get('1')), 2600)
+        self.assertEqual(int(response.json().get('2')), 3000)
+
+        url = '/explorer/v1/addresses/13JGvpZTEm8iUvpjavj3k9SmnwdrhFfcBx/balance'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(int(response.json().get('1')), 400)
+
+    def test_address_no_balance(self):
+        url = '/explorer/v1/addresses/126fiiHJY4PCba1NXoPpSSo3kHpZmGYaaa/balance'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(response.json(), {})
