@@ -63,6 +63,10 @@ class GetLatestBlocksTest(TestCase):
             else:
                 block = test_sample.create_block(str(i), i, i + 1, block, 1, 1)
 
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
+
     def test_get_latest_blocks(self):
         url = '/explorer/v1/blocks'
         response = self.client.get(url)
@@ -82,6 +86,10 @@ class GetBlockByHashTest(TestCase):
     def setUp(self):
         test_sample = TestSetUp()
         test_sample.create_block('000004e0223a146664188edebf7efbce82c3a421ce70f30b71c156368c21caaf', 0, 1, None, 1, 1)
+
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
 
     def test_get_block_by_hash(self):
         url = '/explorer/v1/blocks/000004e0223a146664188edebf7efbce82c3a421ce70f30b71c156368c21caaf'
@@ -104,6 +112,10 @@ class GetBlockByHeightTest(TestCase):
         test_sample.create_block('000004e0223a146664188edebf7efbce82c3a421ce70f30b71c156368c21caaf', 0, 1, None, 1, 1)
         # block in fork chain
         test_sample.create_block('00000319eb1fbe75c75e6ad3970855ac67f8687febd230b3c26c074474889d3b', 1, 2, None, 1, 0)
+
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
 
     def test_get_block_by_height(self):
         url = '/explorer/v1/blocks/1'
@@ -154,6 +166,10 @@ class GetTxByHashTest(TestCase):
                                               self.block2, 1)
         self.tx4 = test_sample.create_normal_tx('2e75d6117852fb0f3a42951a683cf9ab52f2b7d7578f5ac0487c2256aa301769',
                                                 self.block2, self.tx3.tx_outs.all()[0], 1)
+
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
 
     def test_get_tx_by_hash(self):
         # coinbase tx
@@ -244,6 +260,10 @@ class GetColorTxsTest(TestCase):
             txs.append(test_sample.create_other_type_tx(str(i), self.block2, 2, 2, i))
         for i in range(180, 210):
             txs.append(test_sample.create_normal_tx(str(i), self.block3, txs[i - 120].tx_outs.all()[0], 1, i))
+
+    def tearDown(self):
+        Address.objects.all().delete()
+        Block.objects.all().delete()
 
     def test_get_color_txs(self):
         # default page
