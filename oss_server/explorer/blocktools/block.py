@@ -117,7 +117,7 @@ class Block:
         blockchain.seek(curPos)
 
         tempBlockSize = fileSize - curPos
-        
+
         if tempBlockSize < size:
             return False
         return True
