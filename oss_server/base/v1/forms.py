@@ -1,14 +1,20 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+from oss_server.fields import AddressField, ColorField, MintAmountField, TxAmountField
+
 
 class CreateLicenseInfoForm(forms.Form):
-    address = forms.RegexField(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
-                               error_messages={
-                                   'required': '`address` is required',
-                                   'invalid': '`address` is not an address'
-                               })
-    color_id = forms.IntegerField(error_messages={'required': '`color_id` is required'})
+    address = AddressField(error_messages={
+        'required': '`address` is required',
+        'invalid': '`address` is not an address'
+    })
+    color_id = ColorField(error_messages={
+        'required': '`color_id` is required',
+        'invalid': '`color_id` is invalid',
+        'min_value': '`color_id` should be greater than or equal to %(limit_value)s',
+        'max_value': '`color_id` should be less than or equal to %(limit_value)s'
+    })
     name = forms.CharField(max_length=32,
                            error_messages={
                                'required': '`name` is required',
@@ -19,61 +25,56 @@ class CreateLicenseInfoForm(forms.Form):
                                       'required': '`description` is required',
                                       'max_length': 'length of `description` should not exceed 40'
                                   })
-    metadata_link = forms.CharField(max_length=255, required=False,
+    metadata_link = forms.CharField(max_length=100, required=False,
                                     error_messages={
-                                        'max_length': 'length of `metadata_link` should not exceed 255'
+                                        'required': '`metadata_link` is required',
+                                        'max_length': 'length of `metadata_link` should not exceed 100'
                                     })
     member_control = forms.BooleanField(required=False,
                                         error_messages={'required': '`member_control` is required'})
 
 
 class RawTxForm(forms.Form):
-    from_address = forms.RegexField(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
-                                    error_messages={
-                                        'required': '`from_address` is required',
-                                        'invalid': '`from_address` is not an address'
-                                    })
-    to_address = forms.RegexField(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
-                                  error_messages={
-                                      'required': '`to_address` is required',
-                                      'invalid': '`to_address` is not an address'
-                                  })
-    color_id = forms.IntegerField(min_value=0,
-                                  error_messages={
-                                      'required': '`color_id` is required',
-                                      'invalid': '`color_id` is invalid',
-                                      'min_value': '`color_id` should be greater than 0'
-                                  })
-    amount = forms.DecimalField(min_value=0,
-                                decimal_places=8,
-                                error_messages={
-                                    'required': '`amount` is required',
-                                    'invalid': '`amount` is invalid',
-                                    'min_value': '`amount` should be greater than 0',
-                                    'max_decimal_places': '`amount` only allow up to 8 decimal digits'
-                                })
+    from_address = AddressField(error_messages={
+        'required': '`from_address` is required',
+        'invalid': '`from_address` is not an address'
+    })
+    to_address = AddressField(error_messages={
+        'required': '`to_address` is required',
+        'invalid': '`to_address` is not an address'
+    })
+    color_id = ColorField(error_messages={
+        'required': '`color_id` is required',
+        'invalid': '`color_id` is invalid',
+        'min_value': '`color_id` should be greater than or equal to %(limit_value)s',
+        'max_value': '`color_id` should be less than or equal to %(limit_value)s'
+    })
+    amount = TxAmountField(error_messages={
+        'required': '`amount` is required',
+        'invalid': '`amount` is invalid',
+        'min_value': '`amount` should be greater than or equal to %(limit_value)s',
+        'max_value': '`amount` should be less than or equal to %(limit_value)s',
+        'max_decimal_places': '`amount` only allow up to %(max)s decimal digits'
+    })
 
 
 class MintRawTxForm(forms.Form):
-    mint_address = forms.RegexField(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
-                                    error_messages={
-                                        'required': '`mint_address` is required',
-                                        'invalid': '`mint_address` is not an address'
-                                    })
-    color_id = forms.IntegerField(min_value=0,
-                                  error_messages={
-                                      'required': '`color_id` is required',
-                                      'invalid': '`color_id` is invalid',
-                                      'min_value': '`color_id` should be greater than 0'
-                                  })
-    amount = forms.DecimalField(min_value=0,
-                                decimal_places=8,
-                                error_messages={
-                                    'required': '`amount` is required',
-                                    'invalid': '`amount` is invalid',
-                                    'min_value': '`amount` should be greater than 0',
-                                    'max_decimal_places': '`amount` only allow up to 8 decimal digits'
-                                })
+    mint_address = AddressField(error_messages={
+        'required': '`mint_address` is required',
+        'invalid': '`mint_address` is not an address'
+    })
+    color_id = ColorField(error_messages={
+        'required': '`color_id` is required',
+        'invalid': '`color_id` is invalid',
+        'min_value': '`color_id` should be greater than or equal to %(limit_value)s',
+        'max_value': '`color_id` should be less than or equal to %(limit_value)s'
+    })
+    amount = MintAmountField(error_messages={
+        'required': '`amount` is required',
+        'invalid': '`amount` is invalid',
+        'min_value': '`amount` should be greater than or equal to %(limit_value)s',
+        'max_value': '`amount` should be less than or equal to %(limit_value)s',
+    })
 
     def clean(self):
         cleaned_data = super(MintRawTxForm, self).clean()
