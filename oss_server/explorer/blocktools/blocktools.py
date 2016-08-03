@@ -4,6 +4,7 @@ import struct
 import re
 
 import base58
+from gcoin import ripemd
 
 def uint1(stream):
     return ord(stream.read(1))
@@ -57,7 +58,7 @@ def pubkeyToAddress(pubkey):
     elif re.match(r'^21[a-f0-9]{66}ac$', pubkey):
         pubkey = pubkey[2:-2]
         hash1 = hashlib.sha256(binascii.unhexlify(pubkey))
-        pubkeyHash = hashlib.new('ripemd160', hash1.digest()).digest()
+        pubkeyHash = ripemd.RIPEMD160(hash1.digest()).digest()
     else:
         return ''
 

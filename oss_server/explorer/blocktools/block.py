@@ -4,6 +4,9 @@ from blocktools import *
 from gcoin.transaction import serialize
 
 
+GC30 = 2509744043
+SKIP_LIMIT = 100
+
 class BlockHeader:
 
     def __init__(self, blockchain):
@@ -64,10 +67,25 @@ class Block:
         self.Txs = []
         self.scriptSig = ''
 
-        if self.hasLength(blockchain, 8):
+        # Skip bytes with all 0 between blocks
+        # Note: I assume bytes with all 0 between blocks will no more than SKIP_LIMIT
+        skip_bytes = 0
+        while self.hasLength(blockchain, 8) and skip_bytes < SKIP_LIMIT:
             self.magicNum = uint4(blockchain)
-            self.blocksize = uint4(blockchain)
-        else:
+
+            if self.magicNum == GC30:
+                # this is normal situation
+                self.blocksize = uint4(blockchain)
+                break
+            elif self.magicNum == 0:
+                # skip 4 bytes
+                skip_bytes += 4
+            else:
+                # assume blk file is broken when magic number is not GC30 and 0
+                self.continueParsing = False
+                return
+
+        if skip_bytes >= SKIP_LIMIT:
             self.continueParsing = False
             return
 
@@ -99,7 +117,7 @@ class Block:
         blockchain.seek(curPos)
 
         tempBlockSize = fileSize - curPos
-        
+
         if tempBlockSize < size:
             return False
         return True
