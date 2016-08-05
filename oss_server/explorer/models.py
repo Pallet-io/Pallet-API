@@ -159,6 +159,7 @@ class TxIn(models.Model):
         return OrderedDict([
             ('tx_id', self.txout.tx.hash if self.txout else None),
             ('vout', self.txout.position if self.txout else 0),
+            ('address', self.txout.address.address if self.txout else None),
             ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
         ])
