@@ -123,7 +123,6 @@ class BlkTest(TestCase):
         tx = Tx.objects.get(hash='64f15550e4c7a1640769f8d55a5c261c6578ad4205ba4b854fbdb2907ac12ac0')
         self.assertEqual(tx.type, 0)
         self.assertEqual(tx.tx_ins.all().count(), 1)
-        self.assertEqual(tx.tx_ins.all().first().position, 0xffffffff)
         self.assertIsNone(tx.tx_ins.all().first().txout)
         self.assertEqual(tx.tx_outs.all().count(), 2)
         self.assertEqual(tx.tx_outs.get(position=0).address.address, '1H2jo3AQLoNhKXjDUhYTPHE986iBzggfQJ')
@@ -136,7 +135,6 @@ class BlkTest(TestCase):
         tx = Tx.objects.get(hash='5f9b8d8ed9418d061b450f7572fa428c273104d033341737ae45cd738d70964b')
         self.assertEqual(tx.type, 0)
         self.assertEqual(tx.tx_ins.all().count(), 1)
-        self.assertEqual(tx.tx_ins.all().first().position, 1)
         self.assertEqual(tx.tx_ins.all().first().txout.tx.hash,
                          '4606367894e8ef71a49de69622700680a68bc45e6a219006763c6b243b46ffbf')
         self.assertEqual(tx.tx_outs.all().count(), 2)

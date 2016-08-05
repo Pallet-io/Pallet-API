@@ -152,7 +152,6 @@ class TxOut(models.Model):
 class TxIn(models.Model):
     tx = models.ForeignKey(Tx, related_name='tx_ins', related_query_name='tx_in')
     txout = models.ForeignKey(TxOut, related_name='tx_ins', related_query_name='tx_in', blank=True, null=True)
-    position = models.DecimalField(max_digits=10, decimal_places=0)
     scriptsig = models.BinaryField(blank=True, null=True)
     sequence = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 

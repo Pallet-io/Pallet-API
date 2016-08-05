@@ -5,7 +5,7 @@ from django.db import transaction
 from blocktools.block import Block
 from blocktools.blocktools import *
 
-from .configs import *
+from .configs import BLK_DIR
 from .models import Block as BlockDb
 from .models import Address, Datadir, Tx, TxIn, TxOut
 
@@ -16,8 +16,10 @@ class BlockDbException(Exception):
 
 class BlockDBUpdater(object):
 
-    def __init__(self, blk_dir=None):
-        self.blk_dir = blk_dir or BLK_DIR
+    def __init__(self, blk_dir=BLK_DIR, batch_num=50):
+        self.blk_dir = blk_dir
+        self.batch_num = batch_num
+        self.blocks_hash_cache = []
 
     def update(self):
         # Read the blk file (possibly from last read position) as many as possible, and check if
@@ -30,12 +32,10 @@ class BlockDBUpdater(object):
             if not file_path:
                 break
 
-        self._update_chain_related_info()
-
     def _update_chain_related_info(self):
-        with transaction.atomic('explorer_db'):
-            self._update_block_in_longest()
-            self._update_txout_spent()
+        self.blocks_hash_cache = []
+        self._update_block_in_longest()
+        self._update_txout_spent()
 
     def _update_block_in_longest(self):
         # Get the block with biggest chain_work.
@@ -45,6 +45,7 @@ class BlockDBUpdater(object):
         # From `current_block`, move backward and set `in_longest` of previous blocks
         # to 1 until we meet the fork point.
         while current_block and not current_block.in_longest:
+            self.blocks_hash_cache.append(current_block.hash)
             current_block.in_longest = 1
             current_block.save()
             main_branch_next_block = current_block
@@ -52,7 +53,11 @@ class BlockDBUpdater(object):
 
         # From the fork point, set `in_longest` of blocks in the other fork to 0.
         while current_block and main_branch_next_block:
-            next_blocks = current_block.next_blocks.filter(in_longest=1).exclude(hash=main_branch_next_block.hash)
+            self.blocks_hash_cache.append(current_block.hash)
+
+            next_blocks = (current_block.next_blocks
+                           .filter(in_longest=1).exclude(hash=main_branch_next_block.hash))
+
             if next_blocks.count() > 1:
                 raise BlockDbException('Discovered more than one fork with `in_longest=1`.')
             elif next_blocks.count() == 0:
@@ -64,9 +69,19 @@ class BlockDBUpdater(object):
             current_block = next_block
 
     def _update_txout_spent(self):
-        TxOut.objects.filter(tx__block__in_longest=0).update(spent=None)
-        TxOut.objects.filter(tx_in__isnull=False, tx__block__in_longest=1).update(spent=1)
-        TxOut.objects.filter(tx_in__isnull=True, tx__block__in_longest=1).update(spent=0)
+        txouts_to_update = TxOut.objects.filter(tx__block__hash__in=self.blocks_hash_cache)
+        txouts_to_update.filter(tx__block__in_longest=0).update(spent=None)
+
+        main_chain_txouts = txouts_to_update.filter(tx__block__in_longest=1)
+
+        # reset every `spent` of `txout` to 0 first
+        main_chain_txouts.update(spent=0)
+
+        # update whichever `txout` has a `tx_in` in mainchain
+        main_chain_txouts.filter(
+            tx_in__isnull=False,
+            tx_in__tx__block__in_longest=1
+        ).update(spent=1)
 
     def _parse_raw_block_to_db(self, file_path, file_offset):
         with open(file_path, 'rb') as blockchain:
@@ -75,11 +90,17 @@ class BlockDBUpdater(object):
             blocks = []
             for raw_block in self._parse_raw_block(blockchain):
                 blocks.append(raw_block)
-                # Use atomic transaction for every 10 blocks.
-                if len(blocks) == 10:
-                    self._store_blocks(blockchain, blocks)
+                # Use atomic transaction for every `batch_num` blocks.
+                if len(blocks) == self.batch_num:
+                    self._batch_update_blocks(blockchain, blocks)
                     blocks = []
-            self._store_blocks(blockchain, blocks)
+
+            self._batch_update_blocks(blockchain, blocks)
+
+    def _batch_update_blocks(self, blockchain, block_batch):
+        with transaction.atomic('explorer_db'):
+            self._store_blocks(blockchain, block_batch)
+            self._update_chain_related_info()
 
     def _parse_raw_block(self, blockchain_file):
         continue_parsing = True
@@ -98,12 +119,11 @@ class BlockDBUpdater(object):
     def _store_blocks(self, blockchain, blocks):
         # Write blocks and update blk file offset in the database. Blk file offset is retrieved
         # by calling tell() on `blockchain`. Transaction is used to ensure data integrity.
-        with transaction.atomic('explorer_db'):
-            for block in blocks:
-                self._raw_block_to_db(block)
-            datadir = self._get_or_create_datadir()
-            datadir.blkfile_offset = blockchain.tell()
-            datadir.save()
+        for block in blocks:
+            self._raw_block_to_db(block)
+        datadir = self._get_or_create_datadir()
+        datadir.blkfile_offset = blockchain.tell()
+        datadir.save()
 
     def _raw_block_to_db(self, block):
         blockheader = block.blockHeader
@@ -145,15 +165,14 @@ class BlockDBUpdater(object):
         )
         tx_db.save()
 
-        for i in tx.inputs:
-            self._raw_txin_to_db(i, i.txOutId, tx_db)
+        for txin in tx.inputs:
+            self._raw_txin_to_db(txin, tx_db)
         for i in range(tx.outCount):
             self._raw_txout_to_db(tx.outputs[i], i, tx_db)
 
-    def _raw_txin_to_db(self, txin, position, tx_db):
+    def _raw_txin_to_db(self, txin, tx_db):
         txin_db = TxIn(
             tx=tx_db,
-            position=position,
             scriptsig=txin.scriptSig,
             sequence=txin.seqNo
         )
@@ -201,7 +220,9 @@ class BlockDBUpdater(object):
         file_name = 'blk{:05d}.dat'.format(datadir.blkfile_number + 1)
         file_path = os.path.join(datadir.dirname, file_name)
         if os.path.exists(file_path):
-            Datadir(dirname=self.blk_dir, blkfile_number=datadir.blkfile_number + 1, blkfile_offset=0).save()
+            Datadir(dirname=self.blk_dir,
+                    blkfile_number=(datadir.blkfile_number+1),
+                    blkfile_offset=0).save()
             return file_path
         else:
             return None

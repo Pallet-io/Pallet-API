@@ -20,21 +20,21 @@ class TestSetUp(object):
 
     def create_coinbase_tx(self, hash, block, time=0):
         tx = Tx.objects.create(hash=hash, block=block, version=1, type=0, time=time)
-        TxIn.objects.create(tx=tx, position=0)
+        TxIn.objects.create(tx=tx)
         TxOut.objects.create(tx=tx, value=0, position=0, scriptpubkey=binascii.unhexlify('aaaa'), address=self.address1,
                              spent=0, color=0)
         return tx
 
     def create_mint_tx(self, hash, block, color, time=0):
         tx = Tx.objects.create(hash=hash, block=block, version=1, type=1, time=time)
-        TxIn.objects.create(tx=tx, position=0)
+        TxIn.objects.create(tx=tx)
         TxOut.objects.create(tx=tx, value=100, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
                              address=self.address1, spent=0, color=color)
         return tx
 
     def create_normal_tx(self, hash, block, txout, color, time=0):
         tx = Tx.objects.create(hash=hash, block=block, version=1, type=0, time=time)
-        TxIn.objects.create(tx=tx, txout=txout, position=0)
+        TxIn.objects.create(tx=tx, txout=txout)
         TxOut.objects.create(tx=tx, value=10, position=1, scriptpubkey=binascii.unhexlify('aaaa'),
                              address=self.address2, spent=0, color=color)
         TxOut.objects.create(tx=tx, value=90, position=0, scriptpubkey=binascii.unhexlify('bbbb'),
@@ -45,7 +45,7 @@ class TestSetUp(object):
 
     def create_other_type_tx(self, hash, block, type, color, time=0):
         tx = Tx.objects.create(hash=hash, block=block, version=1, type=type, time=time)
-        TxIn.objects.create(tx=tx, position=0)
+        TxIn.objects.create(tx=tx)
         TxOut.objects.create(tx=tx, value=0, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
                              address=self.address1, spent=0, color=color)
 
@@ -280,7 +280,7 @@ class GetColorTxsTest(TestCase):
 
         # a new tx should not affect the next page query
         tx = Tx.objects.create(hash='1234', block=self.block1, version=1, type=1)
-        TxIn.objects.create(tx=tx, position=0)
+        TxIn.objects.create(tx=tx)
         TxOut.objects.create(tx=tx, value=100, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
                              address=self.address1, spent=0, color=1)
 
@@ -404,7 +404,7 @@ class GetAddressTxsTest(TestCase):
 
         # a new tx should not affect the next page query
         tx = Tx.objects.create(hash='1234', block=self.block1, version=1, type=1)
-        TxIn.objects.create(tx=tx, position=0)
+        TxIn.objects.create(tx=tx)
         TxOut.objects.create(tx=tx, value=100, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
                              address=self.address1, spent=0, color=1)
 
@@ -434,7 +434,7 @@ class GetAddressTxsTest(TestCase):
 
         # a new tx should not affect the next page query
         tx = Tx.objects.create(hash='4321', block=self.block1, version=1, type=1)
-        TxIn.objects.create(tx=tx, position=0)
+        TxIn.objects.create(tx=tx)
         TxOut.objects.create(tx=tx, value=100, position=0, scriptpubkey=binascii.unhexlify('aaaa'),
                              address=self.address1, spent=0, color=1)
 
