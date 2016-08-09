@@ -140,6 +140,14 @@ class TxOut(models.Model):
             ('amount', self.value),
         ])
 
+    def utxo_dict(self):
+        return OrderedDict([
+            ('tx', self.tx.hash),
+            ('n', self.position),
+            ('color', self.color),
+            ('value', self.value)
+        ])
+
 
 class TxIn(models.Model):
     tx = models.ForeignKey(Tx, related_name='tx_ins', related_query_name='tx_in')
