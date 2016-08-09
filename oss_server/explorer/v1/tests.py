@@ -558,7 +558,7 @@ class GetAddressUtxoAndBalanceTest(TestCase):
             # spend txs[0:20]
             tx = Tx.objects.create(hash=str(i), block=self.block1, version=1, type=0, time=i)
             txout = txs[i - 60].tx_outs.all()[0]
-            TxIn.objects.create(tx=tx, txout=txout, position=0)
+            TxIn.objects.create(tx=tx, txout=txout)
             TxOut.objects.create(tx=tx, value=10, position=1, scriptpubkey=binascii.unhexlify('aaaa'),
                                  address=self.address2, spent=0, color=1)
             TxOut.objects.create(tx=tx, value=10, position=2, scriptpubkey=binascii.unhexlify('aaaa'),
@@ -571,7 +571,7 @@ class GetAddressUtxoAndBalanceTest(TestCase):
             # txs in fork block
             tx = Tx.objects.create(hash=str(i), block=self.block2, version=1, type=0, time=i)
             txout = txs[i - 50].tx_outs.all()[0]
-            TxIn.objects.create(tx=tx, txout=txout, position=0)
+            TxIn.objects.create(tx=tx, txout=txout)
             TxOut.objects.create(tx=tx, value=10, position=1, scriptpubkey=binascii.unhexlify('aaaa'),
                                  address=self.address2, spent=None, color=2)
             TxOut.objects.create(tx=tx, value=10, position=2, scriptpubkey=binascii.unhexlify('aaaa'),
