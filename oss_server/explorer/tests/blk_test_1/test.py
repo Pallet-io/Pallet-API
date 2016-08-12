@@ -17,7 +17,8 @@ class BlkTest(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        pass
+        Block.objects.all().delete()
+        Datadir.objects.all().delete()
 
     def test_block_count(self):
         blocks = Block.objects.all()
