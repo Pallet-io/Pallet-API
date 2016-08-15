@@ -42,7 +42,7 @@ class Block(models.Model):
         # main branch
         else:
             max_height = Block.objects.filter(in_longest=1).count()
-            return int(max_height - self.height) + 1
+            return int(max_height - self.height)
 
     @property
     def branch(self):
