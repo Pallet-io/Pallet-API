@@ -135,14 +135,15 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-LOG_DIR =  os.path.dirname(BASE_DIR) + '/log/'
+LOG_DIR = os.path.dirname(BASE_DIR) + '/log/'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format' : "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
-            'datefmt' : "%d/%b/%Y %H:%M:%S"
+            'format': "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            'datefmt': "%d/%b/%Y %H:%M:%S"
         },
     },
     'handlers': {
@@ -152,13 +153,21 @@ LOGGING = {
             'filename': LOG_DIR + 'django.log',
             'formatter': 'verbose'
         },
+        'explorer_log_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': LOG_DIR + 'explorer.log',
+            'formatter': 'verbose'
+        }
     },
     'loggers': {
         'notification': {
             'handlers': ['file'],
             'level': 'DEBUG'
+        },
+        'explorer': {
+            'handlers': ['explorer_log_file'],
+            'level': 'INFO'
         }
     }
 }
-
-
