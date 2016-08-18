@@ -1,4 +1,7 @@
+import logging
 import os
+import traceback
+from time import sleep
 
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import transaction
@@ -10,9 +13,30 @@ from .configs import BLK_DIR
 from .models import Block as BlockDb
 from .models import Address, Datadir, Tx, TxIn, TxOut
 
+logger = logging.getLogger(__name__)
+
 
 class BlockDbException(Exception):
     """Exception for block db contents."""
+
+
+class BlockUpdateDaemon(object):
+
+    def __init__(self, sleep_time=15, blk_dir=BLK_DIR, batch_num=50):
+        self.blk_dir = blk_dir
+        self.batch_num = batch_num
+        self.sleep_time = sleep_time
+
+    def run_forever(self):
+        while True:
+            logger.info('-'*60)
+            logger.info('Start a new update!')
+            updater = BlockDBUpdater(self.blk_dir, self.batch_num)
+            try:
+                updater.update()
+            except Exception as e:
+                logger.exception('Error when updater.update(): {}'.format(e))
+            sleep(self.sleep_time)
 
 
 class BlockDBUpdater(object):
@@ -27,6 +51,8 @@ class BlockDBUpdater(object):
         # there's a following blk file to read. If so, continue to parse the file.
         while True:
             file_path, file_offset = self._get_blk_file_info()
+            logger.info('Update from File path: {}; File offset: {}'.format(file_path, file_offset))
+
             self._parse_raw_block_to_db(file_path, file_offset)
 
             file_path, file_offset = self._get_next_blk_file_info(), 0
@@ -150,6 +176,7 @@ class BlockDBUpdater(object):
             block_db.height = 0
 
         block_db.save()
+        logger.info("Block saved: {}".format(hashStr(block_db.hash)))
 
         for tx in block.Txs:
             self._raw_tx_to_db(tx, block_db)
@@ -232,7 +259,7 @@ class BlockDBUpdater(object):
         file_path = os.path.join(datadir.dirname, file_name)
         if os.path.exists(file_path):
             Datadir(dirname=self.blk_dir,
-                    blkfile_number=(datadir.blkfile_number+1),
+                    blkfile_number=(datadir.blkfile_number + 1),
                     blkfile_offset=0).save()
             return file_path
         else:
