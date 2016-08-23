@@ -7,11 +7,11 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
-from gcoin import encode_license, make_mint_raw_tx, make_raw_tx
+from gcoin import encode_license, make_mint_raw_tx, make_raw_tx, mk_op_return_script
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter, WalletError
 
-from .forms import CreateLicenseInfoForm, MintRawTxForm, RawTxForm
+from .forms import CreateLicenseRawTxForm, MintRawTxForm, RawTxForm
 from ..utils import balance_from_utxos, select_utxo
 
 logger = logging.getLogger(__name__)
@@ -51,76 +51,78 @@ class GetLicenseInfoView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class CreateLicenseInfoView(View):
+class CreateLicenseRawTxView(View):
 
     def __init__(self):
-        super(CreateLicenseInfoView, self).__init__()
-        self._rpc = get_rpc_connection()
+        super(CreateLicenseRawTxView, self).__init__()
+        self._conn = get_rpc_connection()
+        self.TX_LICENSE_TYPE = 2
 
     def get(self, request):
-        """
-        Before calling this method, make sure gcoin has already been minted some color 0 coins in advance.
-        This preparation needs to be done only once. The used coin would be refilled when a license is created.
-        """
-        form = CreateLicenseInfoForm(request.GET)
+        form = CreateLicenseRawTxForm(request.GET)
         if form.is_valid():
-            address = form.cleaned_data['address']
             color_id = form.cleaned_data['color_id']
-            license_hex = self._get_license_hex_from_cleaned_data(form.cleaned_data)
-            response, status = self._send_license_to_address(address, color_id, license_hex)
+            to_address = form.cleaned_data['to_address']
+            alliance_member_address = form.cleaned_data['alliance_member_address']
 
-            if status == httplib.OK:
-                self._refill_color_zero_coin()
+            if self._is_license_created(color_id):
+                return JsonResponse({'error': 'license with such color already exists'}, status=httplib.BAD_REQUEST)
 
-            return JsonResponse(response, status=status)
+            color_0_utxo = self._find_color_0_utxo(alliance_member_address)
+            if not color_0_utxo:
+                return JsonResponse({'error': 'insufficient color 0 in alliance member address'}, status=httplib.BAD_REQUEST)
+
+            color_0_tx_ins = [{
+                'tx_id': color_0_utxo['txid'],
+                'index': color_0_utxo['vout'],
+                'script': color_0_utxo['scriptPubKey']
+            }]
+
+            license_script = self._get_license_script(form.cleaned_data)
+            license_info_tx_outs = [
+                {'address': to_address, 'value': int(10**8), 'color': color_id},
+                {'script': license_script, 'value': 0, 'color': color_id}
+            ]
+
+            create_license_raw_tx = make_raw_tx(color_0_tx_ins, license_info_tx_outs, self.TX_LICENSE_TYPE)
+            return JsonResponse({'raw_tx': create_license_raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
 
-    def _refill_color_zero_coin(self):
-        # Each time a license is sent to an address, one color 0 coin will be consumed,
-        # so we replenish one here.
-        self._rpc.mint(1, 0)
-
-    def _send_license_to_address(self, address, color_id, license_hex):
+    def _is_license_created(self, color_id):
         try:
-            tx_id = self._rpc.sendlicensetoaddress(address, color_id, license_hex)
-            response = {'tx_id': tx_id}
-            status = httplib.OK
-        except WalletError as e:
-            if e.message == 'Insufficient LICENSE type funds':
-                logger.error('Invalid SendLicenseToAddress', extra=e.__dict__)
-                response = {'error': 'require `color 0` to create a license'}
-                status = httplib.BAD_REQUEST
-            elif 'License is already created' in e.message:
-                logger.error('Invalid SendLicenseToAddress', extra=e.__dict__)
-                response = {'error': 'license with `color_id` is already created'}
-                status = httplib.BAD_REQUEST
-            else:
-                raise e
+            self._conn.getlicenseinfo(int(color_id))
+            return True
+        except InvalidParameter:
+            return False
 
-        return response, status
+    def _find_color_0_utxo(self, alliance_member_address):
+        utxos = self._conn.gettxoutaddress(alliance_member_address)
+        inputs = select_utxo(utxos=utxos, color=0, sum=1)
+        return inputs[0] if inputs else None
 
-    def _get_license_hex_from_cleaned_data(self, cleaned_data):
+    def _get_license_script(self, data):
         license = {
-            'name': cleaned_data['name'],
-            'description': cleaned_data['description'],
+            'name': data['name'],
+            'description': data['description'],
             'issuer': 'none',
             'fee_collector': 'none',
-            'member_control': cleaned_data['member_control'],
-            'metadata_link': cleaned_data['metadata_link'],
+            'member_control': data['member_control'],
+            'metadata_link': data['metadata_link'],
+            'upper_limit' : data['upper_limit'] or 0,
         }
-
-        return encode_license(license)
+        
+        license_hex = encode_license(license)
+        return mk_op_return_script(license_hex)
 
 
 class GetRawTxView(View):
 
     def get(self, request, tx_id, *args, **kwargs):
         try:
-            rpc = get_rpc_connection()
-            response = rpc.getrawtransaction(tx_id)
+            response = get_rpc_connection().getrawtransaction(tx_id)
             return JsonResponse(response.__dict__)
         except (InvalidParameter, InvalidAddressOrKey):
             response = {'error': 'transaction not found'}
@@ -154,24 +156,28 @@ class CreateRawTxView(View):
                     return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
                 inputs += fee
 
-            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout'], 'script': utxo['scriptPubKey']} for utxo in inputs]
+            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout'],
+                    'script': utxo['scriptPubKey']} for utxo in inputs]
             outs = [{'address': to_address, 'value': int(amount * 10**8), 'color': color_id}]
             # Now for the `change` part.
             if color_id == 1:
                 inputs_value = balance_from_utxos(inputs)[color_id]
                 change = inputs_value - amount - 1
                 if change:
-                    outs.append({'address': from_address, 'value': int(change * 10**8), 'color': color_id})
+                    outs.append({'address': from_address,
+                                 'value': int(change * 10**8), 'color': color_id})
             else:
                 inputs_value = balance_from_utxos(inputs)[color_id]
                 change = inputs_value - amount
                 if change:
-                    outs.append({'address': from_address, 'value': int(change * 10**8), 'color': color_id})
+                    outs.append({'address': from_address,
+                                 'value': int(change * 10**8), 'color': color_id})
                 # Fee `change`.
                 fee_value = balance_from_utxos(inputs)[1]
                 fee_change = fee_value - 1
                 if fee_change:
-                    outs.append({'address': from_address, 'value': int(fee_change * 10**8), 'color': 1})
+                    outs.append({'address': from_address,
+                                 'value': int(fee_change * 10**8), 'color': 1})
 
             raw_tx = make_raw_tx(ins, outs)
             return JsonResponse({'raw_tx': raw_tx})
@@ -204,6 +210,7 @@ class GetBalanceView(View):
 
 
 class CreateMintRawTxView(View):
+
     def get(self, request, *args, **kwargs):
         form = MintRawTxForm(request.GET)
         if form.is_valid():
