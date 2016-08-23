@@ -9,21 +9,21 @@ from gcoinrpc.exceptions import InvalidParameter, WalletError
 class GetLicenseInfoTest(TestCase):
 
     def setUp(self):
-        self.url = "/base/v1/license/2"
+        self.url = '/base/v1/license/2'
         self.sample_license_info = {
-            "member_control": "false",
-            "metadata_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-            "divisibility": "true",
-            "name": "Test",
-            "mint_schedule": "free",
-            "description": "",
-            "metadata_link": "",
-            "fee_type": "fixed",
-            "version": 1,
-            "upper_limit": 0,
-            "fee_collector": "",
-            "fee_rate": "0E-8",
-            "issuer": ""
+            'member_control': 'false',
+            'metadata_hash': '0000000000000000000000000000000000000000000000000000000000000000',
+            'divisibility': 'true',
+            'name': 'Test',
+            'mint_schedule': 'free',
+            'description': '',
+            'metadata_link': '',
+            'fee_type': 'fixed',
+            'version': 1,
+            'upper_limit': 0,
+            'fee_collector': '',
+            'fee_rate': '0E-8',
+            'issuer': ''
         }
 
     @mock.patch('base.v1.views.get_rpc_connection')
@@ -50,48 +50,48 @@ class GetLicenseInfoTest(TestCase):
 class GetRawTxTest(TestCase):
 
     def setUp(self):
-        self.url = "/base/v1/transaction/c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e"
+        self.url = '/base/v1/transaction/c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e'
         sample_transaction = {
-            "vout": [{
-                "color": 0,
-                "scriptPubKey": {
-                    "reqSigs": 1,
-                    "hex": "2102958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1bac",
-                    "addresses": ["1A7R8nWmDv4DR7x2ZFyxPt4rBCc3ZBViQF"],
-                    "asm": "02958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1b OP_CHECKSIG",
-                    "type": "pubkey"
+            'vout': [{
+                'color': 0,
+                'scriptPubKey': {
+                    'reqSigs': 1,
+                    'hex': '2102958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1bac',
+                    'addresses': ['1A7R8nWmDv4DR7x2ZFyxPt4rBCc3ZBViQF'],
+                    'asm': '02958e42b2466eebf112d33afc9231189ff5f7f0537b50bda81432c527c943da1b OP_CHECKSIG',
+                    'type': 'pubkey'
                 },
-                "value": 0,
-                "n": 0
+                'value': 0,
+                'n': 0
             }],
-            "blockhash": "00000cf2acf8ff6bf0c0d01cf9044161e9a320a36234a61742640fe7bd3d6679",
-            "hex": "01000000010000000000000000000000000000000000000000000000000000000000000000"
-                   "ffffffff49483045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30"
-                   "c763c1e7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a32013"
-                   "50ce4f01ffffffff010000000000000000232102958e42b2466eebf112d33afc9231189ff5"
-                   "f7f0537b50bda81432c527c943da1bac00000000d5a3465700000000",
-            "vin": [{
-                "coinbase": "483045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c7"
-                            "63c1e7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511"
-                            "a3201350ce4f01",
-                "scriptSig": {
-                    "hex": "483045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c763"
-                           "c1e7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a320"
-                           "1350ce4f01",
-                    "asm": "3045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c763c1e"
-                           "7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a3201350"
-                           "ce4f01"
+            'blockhash': '00000cf2acf8ff6bf0c0d01cf9044161e9a320a36234a61742640fe7bd3d6679',
+            'hex': '01000000010000000000000000000000000000000000000000000000000000000000000000'
+                   'ffffffff49483045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30'
+                   'c763c1e7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a32013'
+                   '50ce4f01ffffffff010000000000000000232102958e42b2466eebf112d33afc9231189ff5'
+                   'f7f0537b50bda81432c527c943da1bac00000000d5a3465700000000',
+            'vin': [{
+                'coinbase': '483045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c7'
+                            '63c1e7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511'
+                            'a3201350ce4f01',
+                'scriptSig': {
+                    'hex': '483045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c763'
+                           'c1e7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a320'
+                           '1350ce4f01',
+                    'asm': '3045022100f2b9b4ef2324f1d7bcfe0c5b4eea1667655fc819ec6e5f1b8c30c763c1e'
+                           '7876b02200b1e53ffa336fa2fa4a474f98eff62b97672efd71cd569927511a3201350'
+                           'ce4f01'
                 },
-                "sequence": 4294967295
+                'sequence': 4294967295
             }],
-            "txid": "c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e",
-            "blocktime": 1464247255,
-            "version": 1,
-            "confirmations": 4,
-            "time": 1464247255,
-            "locktime": 1464247253,
-            "type": "NORMAL",
-            "size": 176
+            'txid': 'c53cd739cbfd95705393602c76f954962bdf9f86686bf861c0f15aea5716bd1e',
+            'blocktime': 1464247255,
+            'version': 1,
+            'confirmations': 4,
+            'time': 1464247255,
+            'locktime': 1464247253,
+            'type': 'NORMAL',
+            'size': 176
         }
 
         self.sample_transaction = TransactionInfo(**sample_transaction)
@@ -125,26 +125,44 @@ class GetRawTxTest(TestCase):
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
 
 
-class CreateLicenseInfoTest(TestCase):
+class CreateLicenseRawTxTest(TestCase):
 
     def setUp(self):
         self.url = '/base/v1/license/create'
-        self.sample_txid = {
-            'tx_id': '3481dbaf53ef3c56f0c0620b61b9d05c80473448f6a269d55d664f3e9385c951'}
-        self.sample_params = {'description': 'description', 'color_id': 1, 'name': 'name',
-                              'address': '16EBY8jTAaXo14hcU7syyMsoatwcNqD1Md', 'member_control': True}
+        self.sample_txoutaddress = [
+            {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
+             'vout': 0,
+             'color': 0,
+             'value': 2,
+             'scriptPubKey': '2103dd5ed2dd68648b0a77a4a7f3e23c35e05f311e14e73a8012304f0e22ce3ae23fac'},
+            {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
+             'vout': 0,
+             'color': 0,
+             'value': 10,
+             'scriptPubKey': '76a914232e8540e8a3ff0b688854def11147970e7b6ce188ac'},
+        ]
+        self.sample_license = {'name': 'test license'}
+        self.sample_params = {
+            'description': 'description',
+            'color_id': 1,
+            'name': 'name',
+            'to_address': '16EBY8jTAaXo14hcU7syyMsoatwcNqD1Md',
+            'alliance_member_address': '16EBY8jTAaXo14hcU7syyMsoatwcNqD1Md',
+            'member_control': True
+        }
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_create_license(self, mock_rpc):
-        mock_rpc().sendlicensetoaddress.return_value = self.sample_txid['tx_id']
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        mock_rpc().getlicenseinfo.side_effect = InvalidParameter({'code': -8,
+                                                                  'message': 'License color not exist.'})
         response = self.client.get(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.OK)
-        self.assertEqual(response.json(), self.sample_txid)
+        self.assertIn('raw_tx', response.json())
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_miss_field_form(self, mock_rpc):
-        mock_rpc().sendlicensetoaddress.return_value = self.sample_txid['tx_id']
-        required_field = ['description', 'color_id', 'name', 'address']
+        required_field = ['description', 'color_id', 'name', 'to_address', 'alliance_member_address']
         for field in required_field:
             miss_field_params = dict(self.sample_params)
             del miss_field_params[field]
@@ -153,7 +171,6 @@ class CreateLicenseInfoTest(TestCase):
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_wrong_len_field(self, mock_rpc):
-        mock_rpc().sendlicensetoaddress.return_value = self.sample_txid['tx_id']
         field_max_len = {'name': 32, 'description': 40}
         for field in field_max_len:
             wrong_len_field_params = dict(self.sample_params)
@@ -163,15 +180,15 @@ class CreateLicenseInfoTest(TestCase):
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_not_enough_color_zero_coin(self, mock_rpc):
-        mock_rpc().sendlicensetoaddress.side_effect = WalletError({'code': -4,
-                                                                   'message': 'Insufficient LICENSE type funds'})
+        mock_rpc().gettxoutaddress.return_value = None
+        mock_rpc().getlicenseinfo.side_effect = InvalidParameter({'code': -8,
+                                                                  'message': 'License color not exist.'})
         response = self.client.get(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_license_already_exists(self, mock_rpc):
-        mock_rpc().sendlicensetoaddress.side_effect = WalletError({'code': -4,
-                                                                   'message': 'License is already created'})
+        mock_rpc().getlicenseinfo.return_value = self.sample_license
         response = self.client.get(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
@@ -179,17 +196,17 @@ class CreateLicenseInfoTest(TestCase):
 class GetBalanceTest(TestCase):
 
     def setUp(self):
-        self.url = "/base/v1/balance/1NYbzjaq486dGjuXz1Kiu9L7PY6svgaDn7"
+        self.url = '/base/v1/balance/1NYbzjaq486dGjuXz1Kiu9L7PY6svgaDn7'
         self.sample_txoutaddress = [
             {
-                "txid": "tx_id", "vout": 0, "color": 1, "value": 1
+                'txid': 'tx_id', 'vout': 0, 'color': 1, 'value': 1
             },
             {
-                "txid": "tx_id", "vout": 1, "color": 1, "value": 998999
+                'txid': 'tx_id', 'vout': 1, 'color': 1, 'value': 998999
             }
         ]
-        self.sample_balance = {"1": 999000}
-        self.wrong_address_url = "/base/v1/balance/123321"
+        self.sample_balance = {'1': 999000}
+        self.wrong_address_url = '/base/v1/balance/123321'
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_get_balance(self, mock_rpc):
@@ -336,6 +353,7 @@ class SendRawTxTest(TestCase):
 
 
 class CreateMintRawTxTest(TestCase):
+
     def setUp(self):
         self.url = '/base/v1/mint/create'
         self.mint_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'

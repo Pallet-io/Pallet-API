@@ -4,10 +4,14 @@ from django.core.exceptions import ValidationError
 from oss_server.fields import AddressField, ColorField, MintAmountField, TxAmountField
 
 
-class CreateLicenseInfoForm(forms.Form):
-    address = AddressField(error_messages={
-        'required': '`address` is required',
-        'invalid': '`address` is not an address'
+class CreateLicenseRawTxForm(forms.Form):
+    alliance_member_address = AddressField(error_messages={
+        'required': '`alliance_member_address` is required',
+        'invalid': '`alliance_member_address` is not an address'
+    })
+    to_address = AddressField(error_messages={
+        'required': '`to_address` is required',
+        'invalid': '`to_address` is not an address'
     })
     color_id = ColorField(error_messages={
         'required': '`color_id` is required',
@@ -30,8 +34,13 @@ class CreateLicenseInfoForm(forms.Form):
                                         'required': '`metadata_link` is required',
                                         'max_length': 'length of `metadata_link` should not exceed 100'
                                     })
-    member_control = forms.BooleanField(required=False,
-                                        error_messages={'required': '`member_control` is required'})
+    member_control = forms.BooleanField(required=False)
+
+    upper_limit = forms.IntegerField(max_value=10**10, min_value=0, required=False,
+                                     error_messages={
+                                         'min_value': '`upper_limit` should be greater than or equal to %(limit_value)s',
+                                         'max_value': '`upper_limit` should be less than or equal to %(limit_value)s'
+                                     })
 
 
 class RawTxForm(forms.Form):
