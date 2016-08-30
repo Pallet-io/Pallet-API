@@ -134,3 +134,31 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 
 STATIC_URL = '/static/'
+
+LOG_DIR =  os.path.dirname(BASE_DIR) + '/log/'
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format' : "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            'datefmt' : "%d/%b/%Y %H:%M:%S"
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': LOG_DIR + 'django.log',
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'notification': {
+            'handlers': ['file'],
+            'level': 'DEBUG'
+        }
+    }
+}
+
+
