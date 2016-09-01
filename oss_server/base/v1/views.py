@@ -9,9 +9,9 @@ from django.views.generic import View
 
 from gcoin import encode_license, make_mint_raw_tx, make_raw_tx, mk_op_return_script
 from gcoinrpc import connect_to_remote
-from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter, WalletError
+from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from .forms import CreateLicenseRawTxForm, MintRawTxForm, RawTxForm
+from .forms import CreateLicenseRawTxForm, CreateLicenseTransferRawTxForm, MintRawTxForm, RawTxForm
 from ..utils import balance_from_utxos, select_utxo
 
 logger = logging.getLogger(__name__)
@@ -227,3 +227,34 @@ class CreateMintRawTxView(View):
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+
+class CreateLicenseTransferRawTxView(View):
+
+    def get(self, request, *args, **kwargs):
+        form = CreateLicenseTransferRawTxForm(request.GET)
+        if form.is_valid():
+            from_address = form.cleaned_data['from_address']
+            to_address = form.cleaned_data['to_address']
+            color_id = form.cleaned_data['color_id']
+
+            utxos = get_rpc_connection().gettxoutaddress(from_address, True, 1)
+            utxo = self._get_license_utxo(utxos, color_id)
+            if not utxo:
+                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+
+            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout'], 'script': utxo['scriptPubKey']}]
+            outs = [{'address': to_address, 'value': 100000000, 'color': color_id}]
+
+            raw_tx = make_raw_tx(ins, outs, 2)
+            return JsonResponse({'raw_tx': raw_tx})
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+    def _get_license_utxo(self, utxos, color):
+        for utxo in utxos:
+            if utxo['color'] == color:
+                return utxo
+        return None

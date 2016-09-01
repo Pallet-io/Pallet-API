@@ -92,3 +92,20 @@ class MintRawTxForm(forms.Form):
 
         if color_id == 0 and amount and amount != 1:
             raise ValidationError('can only mint 1 `color 0` at one time', code='invalid')
+
+
+class CreateLicenseTransferRawTxForm(forms.Form):
+    from_address = AddressField(error_messages={
+        'required': '`from_address` is required',
+        'invalid': '`from_address` is not an address'
+    })
+    to_address = AddressField(error_messages={
+        'required': '`to_address` is required',
+        'invalid': '`to_address` is not an address'
+    })
+    color_id = ColorField(error_messages={
+        'required': '`color_id` is required',
+        'invalid': '`color_id` is invalid',
+        'min_value': '`color_id` should be greater than or equal to %(limit_value)s',
+        'max_value': '`color_id` should be less than or equal to %(limit_value)s'
+    })

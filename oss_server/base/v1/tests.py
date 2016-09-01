@@ -130,7 +130,7 @@ class GetRawTxTest(TestCase):
 class CreateLicenseRawTxTest(TestCase):
 
     def setUp(self):
-        self.url = '/base/v1/license/create'
+        self.url = '/base/v1/license/prepare'
         self.sample_txoutaddress = [
             {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
              'vout': 0,
@@ -228,7 +228,7 @@ class GetBalanceTest(TestCase):
 class CreateRawTxTest(TestCase):
 
     def setUp(self):
-        self.url = '/base/v1/transaction/create'
+        self.url = '/base/v1/transaction/prepare'
         self.sample_txoutaddress = [
             {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
              'vout': 0,
@@ -357,7 +357,7 @@ class SendRawTxTest(TestCase):
 class CreateMintRawTxTest(TestCase):
 
     def setUp(self):
-        self.url = '/base/v1/mint/create'
+        self.url = '/base/v1/mint/prepare'
         self.mint_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
 
     def test_create_raw_tx_using_color1(self):
@@ -366,6 +366,51 @@ class CreateMintRawTxTest(TestCase):
                                               'amount': 1})
         self.assertEqual(response.status_code, httplib.OK)
         self.assertIn('raw_tx', response.json())
+
+    def test_missing_form_data(self):
+        response = self.client.get(self.url, {})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+
+class CreateLicenseTransferRawTxTest(TestCase):
+
+    def setUp(self):
+        self.url = '/base/v1/license/transfer/prepare'
+        self.sample_license_txoutaddress = [
+            {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
+             'vout': 0,
+             'color': 1,
+             'value': 1,
+             'scriptPubKey': '2103dd5ed2dd68648b0a77a4a7f3e23c35e05f311e14e73a8012304f0e22ce3ae23fac'},
+            {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
+             'vout': 0,
+             'color': 2,
+             'value': 1,
+             'scriptPubKey': '76a914232e8540e8a3ff0b688854def11147970e7b6ce188ac'},
+        ]
+        self.from_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
+        self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_license_raw_tx(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_license_txoutaddress
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 1})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 2})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'color_id': 3})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient funds'})
 
     def test_missing_form_data(self):
         response = self.client.get(self.url, {})
