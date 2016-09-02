@@ -150,6 +150,7 @@ class CreateLicenseRawTxTest(TestCase):
             'name': 'name',
             'to_address': '16EBY8jTAaXo14hcU7syyMsoatwcNqD1Md',
             'alliance_member_address': '16EBY8jTAaXo14hcU7syyMsoatwcNqD1Md',
+            'metadata_link': 'www.example.com',
             'member_control': True
         }
 

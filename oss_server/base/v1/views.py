@@ -114,7 +114,7 @@ class CreateLicenseRawTxView(View):
             'fee_collector': 'none',
             'member_control': data['member_control'],
             'metadata_link': data['metadata_link'],
-            'upper_limit' : data['upper_limit'] or 0,
+            'upper_limit': data['upper_limit'] or 0,
         }
         
         license_hex = encode_license(license)
