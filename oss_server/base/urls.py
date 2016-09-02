@@ -1,6 +1,6 @@
 from django.conf.urls import url
 
-from .v1.views import (CreateLicenseInfoView,
+from .v1.views import (CreateLicenseRawTxView,
                        CreateMintRawTxView,
                        CreateRawTxView,
                        GetBalanceView,
@@ -11,7 +11,8 @@ from .v1.views import (CreateLicenseInfoView,
 urlpatterns = [
     url('^v1/balance/(?P<address>[a-zA-Z0-9]+)$', GetBalanceView.as_view()),
     url('^v1/license/(?P<color_id>\d+)$', GetLicenseInfoView.as_view()),
-    url('^v1/license/create$', CreateLicenseInfoView.as_view()),
+    url('^v1/license/create$', CreateLicenseRawTxView.as_view()),
+    url('^v1/license/send$', SendRawTxView.as_view()),
     url('^v1/mint/create$', CreateMintRawTxView.as_view()),
     url('^v1/mint/send$', SendRawTxView.as_view()),
     url('^v1/transaction/create$', CreateRawTxView.as_view()),
