@@ -29,13 +29,12 @@ class CreateLicenseRawTxForm(forms.Form):
                                       'required': '`description` is required',
                                       'max_length': 'length of `description` should not exceed 40'
                                   })
-    metadata_link = forms.CharField(max_length=100, required=False,
+    metadata_link = forms.CharField(max_length=100,
                                     error_messages={
                                         'required': '`metadata_link` is required',
                                         'max_length': 'length of `metadata_link` should not exceed 100'
                                     })
     member_control = forms.BooleanField(required=False)
-
     upper_limit = forms.IntegerField(max_value=10**10, min_value=0, required=False,
                                      error_messages={
                                          'min_value': '`upper_limit` should be greater than or equal to %(limit_value)s',
