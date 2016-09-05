@@ -45,6 +45,9 @@ class GetLicenseInfoView(View):
     def get(self, request, color_id, *args, **kwargs):
         try:
             response = get_rpc_connection().getlicenseinfo(int(color_id))
+            # change some dictionary key names
+            response['total_amount'] = response.pop('Total amount')
+            response['owner'] = response.pop('Owner')
             return JsonResponse(response)
         except InvalidParameter:
             response = {'error': 'license color not exist'}

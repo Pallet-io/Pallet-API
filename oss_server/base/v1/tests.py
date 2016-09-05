@@ -23,7 +23,9 @@ class GetLicenseInfoTest(TestCase):
             'upper_limit': 0,
             'fee_collector': '',
             'fee_rate': '0E-8',
-            'issuer': ''
+            'issuer': '',
+            'Total amount': 100,
+            'Owner': '1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY'
         }
 
     @mock.patch('base.v1.views.get_rpc_connection')
