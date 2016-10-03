@@ -11,7 +11,7 @@ from gcoin import (encode_license, make_mint_raw_tx, make_raw_tx,
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from ..utils import balance_from_utxos, select_utxo
+from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
 from .forms import (CreateLicenseRawTxForm, CreateLicenseTransferRawTxForm,
                     CreateSmartContractRawTxForm, MintRawTxForm, RawTxForm)
 
@@ -76,11 +76,7 @@ class CreateLicenseRawTxView(View):
             if not color_0_utxo:
                 return JsonResponse({'error': 'insufficient color 0 in alliance member address'}, status=httplib.BAD_REQUEST)
 
-            color_0_tx_ins = [{
-                'tx_id': color_0_utxo['txid'],
-                'index': color_0_utxo['vout'],
-                'script': color_0_utxo['scriptPubKey']
-            }]
+            color_0_tx_ins = [utxo_to_txin(color_0_utxo)]
 
             license_script = self._get_license_script(form.cleaned_data)
             license_info_tx_outs = [
@@ -141,12 +137,13 @@ class CreateSmartContractRawTxView(View):
             code = form.cleaned_data['code']
             contract_fee = form.cleaned_data['contract_fee'] or self.DEFAULT_CONTRACT_FEE
 
+            utxos = get_rpc_connection().gettxoutaddress(address)
             total_fee = contract_fee + self.TX_FEE
-            inputs = self._select_utxo_inputs(address, total_fee)
+            inputs = select_utxo(utxos=utxos, color=self.FEE_COLOR, sum=total_fee)
             if not inputs:
-                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+                return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
 
-            ins = [self._utxo_to_txin(utxo) for utxo in inputs]
+            ins = [utxo_to_txin(utxo) for utxo in inputs]
 
             outs = self._build_txouts(address, oracles_multisig_address, code, contract_fee, inputs)
 
@@ -156,13 +153,6 @@ class CreateSmartContractRawTxView(View):
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-    def _utxo_to_txin(self, utxo):
-        return {
-            'tx_id': utxo['txid'],
-            'index': utxo['vout'],
-            'script': utxo['scriptPubKey']
-        }
 
     def _build_txouts(self, address, oracles_multisig_address, code, contract_fee, utxo_inputs):
         outs = [
@@ -187,10 +177,6 @@ class CreateSmartContractRawTxView(View):
             })
 
         return outs
-
-    def _select_utxo_inputs(self, address, amount):
-        utxos = get_rpc_connection().gettxoutaddress(address)
-        return select_utxo(utxos=utxos, color=self.FEE_COLOR, sum=amount)
 
 
 class GetRawTxView(View):
@@ -231,8 +217,7 @@ class CreateRawTxView(View):
                     return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
                 inputs += fee
 
-            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout'],
-                    'script': utxo['scriptPubKey']} for utxo in inputs]
+            ins = [utxo_to_txin(utxo) for utxo in inputs]
             outs = [{'address': to_address, 'value': int(amount * 10**8), 'color': color_id}]
             # Now for the `change` part.
             if color_id == 1:
@@ -315,7 +300,7 @@ class CreateLicenseTransferRawTxView(View):
             if not utxo:
                 return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
 
-            ins = [{'tx_id': utxo['txid'], 'index': utxo['vout'], 'script': utxo['scriptPubKey']}]
+            ins = [utxo_to_txin(utxo)]
             outs = [{'address': to_address, 'value': 100000000, 'color': color_id}]
 
             raw_tx = make_raw_tx(ins, outs, 2)
