@@ -164,7 +164,8 @@ class CreateLicenseRawTxTest(TestCase):
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_miss_field_form(self, mock_rpc):
-        required_field = ['description', 'color_id', 'name', 'to_address', 'alliance_member_address']
+        required_field = ['description', 'color_id',
+                          'name', 'to_address', 'alliance_member_address']
         for field in required_field:
             miss_field_params = dict(self.sample_params)
             del miss_field_params[field]
@@ -191,6 +192,49 @@ class CreateLicenseRawTxTest(TestCase):
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_license_already_exists(self, mock_rpc):
         mock_rpc().getlicenseinfo.return_value = self.sample_license
+        response = self.client.get(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+
+class CreateSmartContractRawTxTest(TestCase):
+
+    def setUp(self):
+        self.url = '/base/v1/smartcontract/prepare'
+        self.sample_txoutaddress = [
+            {
+                'txid': 'bb0db93977be1075afd6f17f865f1fc8e015e0d3c80e91bd562c7cfcad127353',
+                'vout': 0,
+                'color': 1,
+                'value': 10000,
+                'scriptPubKey': '76a9141e92d02be0d956de3c32706899dec031830e3a4188ac'
+            },
+        ]
+        self.sample_params = {
+            'address': '13nf9WjwBWY5LY8yxVfmuDPtpowNgPTqNW',
+            'oracles_multisig_address': '3FUvnrSFBwUwGKDHN7wuxe3A1yfPkiHUXP',
+            'code': 'this is code.........',
+            'contract_fee': 1,
+        }
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_tx(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        response = self.client.get(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+    def test_miss_field_form(self):
+        required_field = ['address', 'oracles_multisig_address', 'code']
+        for field in required_field:
+            miss_field_params = dict(self.sample_params)
+            del miss_field_params[field]
+            response = self.client.get(self.url, miss_field_params)
+            self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_balance_not_enough(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = None
+        
         response = self.client.get(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
