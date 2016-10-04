@@ -7,13 +7,15 @@ def select_utxo(utxos, color, sum):
                        txid: ''
                        color: 0,
                        value: 0,
-                       vout: 0
+                       vout: 0,
+                       scriptPubKey: '',
                     },
                     {
                        txid: ''
                        color: 0,
                        value: 0,
-                       vout: 0
+                       vout: 0,
+                       scriptPubKey: '',
                     }]
         color: The color to filter.
         sum: The sum of the returned utxos' total value.
@@ -32,7 +34,7 @@ def select_utxo(utxos, color, sum):
     for i, utxo in enumerate(utxos):
         value += utxo['value']
         if value >= sum:
-            return utxos[:i+1]
+            return utxos[:i + 1]
     return []
 
 
@@ -45,7 +47,8 @@ def balance_from_utxos(utxos):
                        txid: ''
                        color: 0,
                        value: 0,
-                       vout: 0
+                       vout: 0,
+                       scriptPubKey: '',
                     }]
 
     Returns: A balance dictionary with color as key and sum of value of that color as dictionary
@@ -58,3 +61,24 @@ def balance_from_utxos(utxos):
             value = utxo['value']
             balance_dict[color] = balance_dict.get(color, 0) + value
     return balance_dict
+
+
+def utxo_to_txin(utxo):
+    """Return a dict of transaction input build from an utxo.
+
+    Args:
+    utxo: an utxo dict.
+    {
+      txid: ''
+      color: 0,
+      value: 0,
+      vout: 0,
+      scriptPubKey: ''
+    }
+    """
+
+    return {
+        'tx_id': utxo['txid'],
+        'index': utxo['vout'],
+        'script': utxo['scriptPubKey']
+    }
