@@ -266,7 +266,7 @@ class SendRawTxView(CsrfExemptMixin, View):
             response = {'tx_id': tx_id}
             return JsonResponse(response)
         except:
-            logger.error('Invalid transaction: %s', raw_tx, extra={'endpoint': request.path})
+            logger.error('Invalid transaction: %s', raw_tx, exc_info=True)
             response = {'error': 'invalid raw transaction'}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
 
