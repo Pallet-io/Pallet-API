@@ -135,39 +135,50 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-LOG_DIR = os.path.dirname(BASE_DIR) + '/log/'
+# Logger
 
+LOG_DIR = os.path.join(os.path.dirname(BASE_DIR), 'log')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
-            'datefmt': "%d/%b/%Y %H:%M:%S"
+            'format' : "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            'datefmt' : "%Y-%m-%d %H:%M:%S"
         },
     },
     'handlers': {
-        'file': {
+        'debug_log_file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': LOG_DIR + 'django.log',
+            'filename': os.path.join(LOG_DIR, 'debug.log'),
+            'formatter': 'verbose'
+        },
+        'error_log_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'django.log'),
             'formatter': 'verbose'
         },
         'explorer_log_file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': LOG_DIR + 'explorer.log',
+            'filename': os.path.join(LOG_DIR, 'explorer.log'),
             'formatter': 'verbose'
-        }
+        },
     },
     'loggers': {
+        'base': {
+            'handlers': ['debug_log_file', 'error_log_file'],
+            'level': 'DEBUG'
+        },
         'notification': {
-            'handlers': ['file'],
+            'handlers': ['debug_log_file', 'error_log_file'],
             'level': 'DEBUG'
         },
         'explorer': {
             'handlers': ['explorer_log_file'],
             'level': 'INFO'
-        }
+        },
     }
 }
