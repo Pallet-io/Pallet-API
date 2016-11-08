@@ -1,5 +1,6 @@
 import httplib
 
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import View
 
@@ -48,7 +49,9 @@ class GetColorTxsView(View):
         starting_after = request.GET.get('starting_after', None)
 
         # tx should be NORMAL / MINT type and should be in main chain, and distinct() prevents duplicate object
-        tx_list = Tx.objects.filter(tx_out__color=color_id, type__lte=1, block__in_longest=1).distinct()
+        Q1 = Q(tx_out__color=color_id)
+        Q2 = Q(tx_in__txout__color=color_id)
+        tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
 
         try:
             page, txs = tx_pagination(tx_list, starting_after)
@@ -71,7 +74,9 @@ class GetAddressTxsView(View):
         starting_after = request.GET.get('starting_after', None)
 
         # tx should be in main chain, and distinct() prevents duplicate object
-        tx_list = Tx.objects.filter(tx_out__address__address=address, block__in_longest=1).distinct()
+        Q1 = Q(tx_out__address__address=address)
+        Q2 = Q(tx_in__txout__address__address=address)
+        tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
 
         try:
             page, txs = tx_pagination(tx_list, starting_after)

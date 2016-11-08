@@ -321,11 +321,11 @@ class GetAddressTxsTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(len(response.json()['txs']), 50)
         self.assertEqual(response.json()['page']['starting_after'],
-                         '0f20cf47d979684d3eb585c2f35ed16ccce4ee43f5ea86b1dca7351069348252')
+                         '7d6b25544e571675429ee772c677fbc1c4984c8e25c29bb30f5892c1d5cedb6a')
         self.assertEqual(response.json()['page']['ending_before'],
-                         '4b2d20701c0b060f4e814dcffef6b6ede9c9e7f8284b62c2c6386579fe11577d')
+                         'e011780c1f2b82f3f348371efa441f5861cce9a5331bb8adf4122afb11b93a1a')
         self.assertEqual(response.json()['page']['next_uri'],
-                         base_url + '?starting_after=4b2d20701c0b060f4e814dcffef6b6ede9c9e7f8284b62c2c6386579fe11577d')
+                         base_url + '?starting_after=e011780c1f2b82f3f348371efa441f5861cce9a5331bb8adf4122afb11b93a1a')
 
         # last page
         url = base_url + '?starting_after=e290781817430b41415077574c38e09639ef7a47808e3cade67594053fd76dd0'
