@@ -350,7 +350,7 @@ class GetAddressTxsTest(TestCase):
                 check = check or vout['address'] == '1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t'
             self.assertTrue(check)
 
-    def test_page_with_param(self):
+    def test_page_with_starting_tx(self):
         # address 1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t
         base_url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t'
 
@@ -378,6 +378,77 @@ class GetAddressTxsTest(TestCase):
         self.assertEqual(len(response.json()['txs']), 0)
         self.assertEqual(response.json()['page']['starting_after'], None)
         self.assertEqual(response.json()['page']['ending_before'], None)
+        self.assertEqual(response.json()['page']['next_uri'], None)
+
+    def test_txs_address_with_type(self):
+        # tx type NORMAL
+        url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t?tx_type=0'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 16)
+        for tx in response.json()['txs']:
+            self.assertEqual(tx['type'], 'NORMAL')
+
+        # tx type MINT
+        url = '/explorer/v1/transactions/address/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY?tx_type=1'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 7)
+        for tx in response.json()['txs']:
+            self.assertEqual(tx['type'], 'MINT')
+
+        # tx type LICENSE
+        url = '/explorer/v1/transactions/address/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY?tx_type=2'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 2)
+        for tx in response.json()['txs']:
+            self.assertEqual(tx['type'], 'LICENSE')
+
+        # tx type VOTE
+        url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t?tx_type=3'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 1)
+        for tx in response.json()['txs']:
+            self.assertEqual(tx['type'], 'VOTE')
+
+    def test_page_with_type(self):
+        base_url = '/explorer/v1/transactions/address/1BMYKFxXgnnRaLBEka1bKFHTQYkNV4L99H'
+
+        # first page
+        url = base_url + '?tx_type=0'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 50)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '7fb50dd5ff00d6a929ef39f51e7821ce78d141f6d45e7d93918cd5811acaa36b')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '0f20cf47d979684d3eb585c2f35ed16ccce4ee43f5ea86b1dca7351069348252')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=0f20cf47d979684d3eb585c2f35ed16ccce4ee43f5ea86b1dca7351069348252&tx_type=0')
+
+        # second page
+        url = response.json()['page']['next_uri']
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 50)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         'e77be251c7f1ffd03480a68fe6dce1a083a9439bef6dd12889e2a6a11b06ff5c')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         'ee6853ca7fc3ef76f401897c5c17ffce2e29442fd48667b38ec2b704e9130798')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=ee6853ca7fc3ef76f401897c5c17ffce2e29442fd48667b38ec2b704e9130798&tx_type=0')
+
+        # last page
+        url = base_url + '?starting_after=221073f43f0cd54681d646a093bd43f6cfe50a05112c38a557a4fa9c60cb7887&tx_type=0'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 49)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '646e65ed17e35ce732b5c8f3716abaed68885288b4d7d94de3abace83f72d195')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '03785d248b1423434d53a83e4f52eb1a7151fb588b2e4e3d5efcd5ebd3830823')
         self.assertEqual(response.json()['page']['next_uri'], None)
 
     def test_address_without_tx(self):
