@@ -1,5 +1,6 @@
 import os
 
+from django.core.exceptions import MultipleObjectsReturned
 from django.db import transaction
 
 from blocktools.block import Block
@@ -181,6 +182,16 @@ class BlockDBUpdater(object):
             txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
         except Tx.DoesNotExist:
             txin_db.txout = None
+        except MultipleObjectsReturned:
+            block = tx_db.block
+            while block:
+                try:
+                    prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash), block=block)
+                    txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
+                    break
+                except Tx.DoesNotExist:
+                    block = block.prev_block
+            
         txin_db.save()
 
     def _raw_txout_to_db(self, txout, position, tx_db):
