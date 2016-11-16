@@ -5,6 +5,8 @@ from collections import OrderedDict
 
 from django.db import models
 
+from gcoin import decode_op_return_script
+
 
 class Address(models.Model):
     address = models.CharField(unique=True, max_length=40)
@@ -94,8 +96,7 @@ class Tx(models.Model):
         2: 'LICENSE',
         3: 'VOTE',
         4: 'BANVOTE',
-        5: 'MATCH',
-        6: 'CANCEL',
+        5: 'CONTRACT'
     }
 
     hash = models.CharField(max_length=64)
@@ -131,6 +132,11 @@ class TxOut(models.Model):
     spent = models.DecimalField(max_digits=1, decimal_places=0, blank=True, null=True)
     color = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
+    @property
+    def is_op_return(self):
+        # check if script has prefix OP_RETURN
+        return binascii.hexlify(self.scriptpubkey)[:2] == '6a'
+
     def as_dict(self):
         return OrderedDict([
             ('n', self.position),
@@ -146,6 +152,13 @@ class TxOut(models.Model):
             ('n', self.position),
             ('color', self.color),
             ('value', self.value)
+        ])
+
+    def op_return_dict(self):
+        return OrderedDict([
+            ('tx', self.tx.hash),
+            ('n', self.position),
+            ('op_return_data', decode_op_return_script(binascii.hexlify(self.scriptpubkey))),
         ])
 
 
