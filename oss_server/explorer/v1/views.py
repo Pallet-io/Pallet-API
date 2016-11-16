@@ -118,3 +118,13 @@ class GetAddressUtxoView(View):
 
         response = {'utxo': [utxo.utxo_dict() for utxo in utxo_list]}
         return JsonResponse(response)
+
+
+class GetAddressOpReturnView(View):
+    def get(self, request, address):
+        # choose all tx outs if other tx outs in the same tx are related to this address
+        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address, tx__type=5)
+        op_return_out = [out.op_return_dict() for out in tx_out_list if out.is_op_return]
+
+        response = {'txout': op_return_out}
+        return JsonResponse(response)

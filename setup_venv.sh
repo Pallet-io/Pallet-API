@@ -14,5 +14,6 @@ command -v virtualenv > /dev/null 2>&1 || { echo >&2 "virtualenv is not installe
 
 if virtualenv -p python2.7 env; then
     source env/bin/activate
+    pip install --upgrade pip
     pip install --upgrade -r requirements.txt
 fi
