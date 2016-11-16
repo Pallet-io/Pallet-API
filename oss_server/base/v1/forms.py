@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import CharField
 
 from oss_server.fields import AddressField, ColorField, MintAmountField, TxAmountField
 
@@ -85,6 +86,13 @@ class RawTxForm(forms.Form):
         'max_value': '`amount` should be less than or equal to %(limit_value)s',
         'max_decimal_places': '`amount` only allow up to %(max)s decimal digits'
     })
+    op_return_data = CharField(required=False)
+
+    def clean_op_return_data(self):
+        data = self.cleaned_data['op_return_data']
+        if len(data.encode('utf8')) > 128000:
+            raise forms.ValidationError('`op_return_data` exceed 128KB after encoded with utf-8', code='max_length')
+        return data
 
 
 class MintRawTxForm(forms.Form):

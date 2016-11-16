@@ -199,6 +199,7 @@ class CreateRawTxView(View):
             to_address = form.cleaned_data['to_address']
             color_id = form.cleaned_data['color_id']
             amount = form.cleaned_data['amount']
+            op_return_data = form.cleaned_data['op_return_data']
 
             utxos = get_rpc_connection().gettxoutaddress(from_address)
             # Color 1 is used as fee, so here's special case for it.
@@ -239,7 +240,16 @@ class CreateRawTxView(View):
                     outs.append({'address': from_address,
                                  'value': int(fee_change * 10**8), 'color': 1})
 
-            raw_tx = make_raw_tx(ins, outs)
+            if op_return_data:
+                outs.append({
+                    'script': mk_op_return_script(op_return_data.encode('utf8')),
+                    'value': 0,
+                    'color': 0
+                })
+                raw_tx = make_raw_tx(ins, outs, 5)  # contract type
+            else:
+                raw_tx = make_raw_tx(ins, outs)
+
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
