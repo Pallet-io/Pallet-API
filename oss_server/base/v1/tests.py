@@ -220,7 +220,7 @@ class CreateSmartContractRawTxTest(TestCase):
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_create_tx(self, mock_rpc):
         mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
-        response = self.client.get(self.url, self.sample_params)
+        response = self.client.post(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertIn('raw_tx', response.json())
 
@@ -229,14 +229,14 @@ class CreateSmartContractRawTxTest(TestCase):
         for field in required_field:
             miss_field_params = dict(self.sample_params)
             del miss_field_params[field]
-            response = self.client.get(self.url, miss_field_params)
+            response = self.client.post(self.url, miss_field_params)
             self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_balance_not_enough(self, mock_rpc):
         mock_rpc().gettxoutaddress.return_value = None
         
-        response = self.client.get(self.url, self.sample_params)
+        response = self.client.post(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
 
