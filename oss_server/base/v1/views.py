@@ -123,7 +123,7 @@ class CreateLicenseRawTxView(View):
         return mk_op_return_script(license_hex)
 
 
-class CreateSmartContractRawTxView(View):
+class CreateSmartContractRawTxView(CsrfExemptMixin, View):
     FEE_COLOR = 1
     TX_FEE = 1
     DEFAULT_CONTRACT_FEE = 1
