@@ -129,8 +129,8 @@ class CreateSmartContractRawTxView(View):
     DEFAULT_CONTRACT_FEE = 1
     TX_CONTRACT_TYPE = 5
 
-    def get(self, request):
-        form = CreateSmartContractRawTxForm(request.GET)
+    def post(self, request, *args, **kwargs):
+        form = CreateSmartContractRawTxForm(request.POST)
         if form.is_valid():
             address = form.cleaned_data['address']
             oracles_multisig_address = form.cleaned_data['oracles_multisig_address']

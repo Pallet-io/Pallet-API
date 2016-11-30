@@ -1,14 +1,6 @@
 from django.conf.urls import url
 
-from .v1.views import (CreateLicenseRawTxView,
-                       CreateLicenseTransferRawTxView,
-                       CreateMintRawTxView,
-                       CreateSmartContractRawTxView,
-                       CreateRawTxView,
-                       GetBalanceView,
-                       GetLicenseInfoView,
-                       GetRawTxView,
-                       SendRawTxView)
+from .v1.views import *
 
 urlpatterns = [
     url('^v1/balance/(?P<address>[a-zA-Z0-9]+)$', GetBalanceView.as_view()),
