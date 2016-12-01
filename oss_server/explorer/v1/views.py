@@ -73,14 +73,22 @@ class GetAddressTxsView(View):
     def get(self, request, address):
         starting_after = request.GET.get('starting_after', None)
         tx_type = request.GET.get('tx_type', None)
+        since = request.GET.get('since', None)
+        until = request.GET.get('until', None)
 
+        # tx should be in main chain, and distinct() prevents duplicate object
         Q1 = Q(tx_in__txout__address__address=address)
         Q2 = Q(tx_out__address__address=address)
-        # tx should be in main chain, and distinct() prevents duplicate object
+        tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
+
         if tx_type:
-            tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1, type=tx_type).distinct()
-        else:
-            tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
+            tx_list = tx_list.filter(type=tx_type)
+
+        if since:
+            tx_list = tx_list.filter(time__gte=since)
+
+        if until:
+            tx_list = tx_list.filter(time__lte=until)
 
         try:
             page, txs = tx_pagination(tx_list, starting_after)
@@ -91,7 +99,10 @@ class GetAddressTxsView(View):
         if len(txs) > 0 and txs.has_next():
             page['next_uri'] = '/explorer/v1/transactions/address/' + address + '?starting_after=' + txs[-1].hash
             if tx_type:
-                page['next_uri'] = page['next_uri'] + '&tx_type=' + tx_type
+                page['next_uri'] += '&tx_type=' + tx_type
+            if since:
+                page['next_uri'] += '&since=' + since
+
 
         response = {
             'page': page,
