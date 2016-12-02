@@ -2,20 +2,16 @@ from django.core.paginator import EmptyPage
 
 from infinite_scroll_pagination.paginator import SeekPaginator
 
-from .exceptions import *
-from .models import *
+from .models import Tx
 
 
 def tx_pagination(tx_list, starting_after=None, per_page=50):
     pk = None
     time = None
     if starting_after:
-        try:
-            tx = Tx.objects.get(hash=starting_after)
-            pk = tx.pk
-            time = tx.time
-        except Tx.DoesNotExist:
-            raise TxNotFoundException
+        tx = Tx.objects.get(hash=starting_after)
+        pk = tx.pk
+        time = tx.time
 
     paginator = SeekPaginator(tx_list, per_page=per_page, lookup_field='time')
     try:

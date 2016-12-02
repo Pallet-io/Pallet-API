@@ -477,7 +477,7 @@ class GetAddressTxsTest(TestCase):
         self.assertEqual(response.json()['page']['ending_before'],
                          '6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856')
         self.assertEqual(response.json()['page']['next_uri'],
-                         base_url + '?starting_after=6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856')
+                         base_url + '?starting_after=6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856&until=1470816119')
         for tx in response.json()['txs']:
             self.assertLessEqual(int(tx['time']), 1470816119)
 
@@ -491,7 +491,7 @@ class GetAddressTxsTest(TestCase):
         self.assertEqual(response.json()['page']['ending_before'],
                          '6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856')
         self.assertEqual(response.json()['page']['next_uri'],
-                         base_url + '?starting_after=6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856&since=1470326158')
+                         base_url + '?starting_after=6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856&since=1470326158&until=1470816119')
         for tx in response.json()['txs']:
             self.assertGreaterEqual(int(tx['time']), 1470326158)
             self.assertLessEqual(int(tx['time']), 1470816119)
@@ -524,7 +524,7 @@ class GetAddressTxsTest(TestCase):
 
     def test_txs_address_with_all_params(self):
         base_url = '/explorer/v1/transactions/address/1BMYKFxXgnnRaLBEka1bKFHTQYkNV4L99H'
-        url = base_url + '?since=1470242210&until=1470816119&tx_type=1&starting_after=354c390658fd4fcf760493006d41132dd5a75f9d3b018777d1d2b78a8c2b790c'
+        url = base_url + '?since=1470242210&until=1470816119&tx_type=1&page_size=20&starting_after=354c390658fd4fcf760493006d41132dd5a75f9d3b018777d1d2b78a8c2b790c'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(len(response.json()['txs']), 3)
@@ -557,6 +557,35 @@ class GetAddressTxsTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
         self.assertEqual(response.json(), {'error': 'tx not exist'})
+
+
+class TxPaginationTest(TestCase):
+
+    def test_address_txs(self):
+        base_url = '/explorer/v1/transactions/address/1BMYKFxXgnnRaLBEka1bKFHTQYkNV4L99H'
+        url = base_url + '?page_size=20'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 20)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '7fb50dd5ff00d6a929ef39f51e7821ce78d141f6d45e7d93918cd5811acaa36b')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '9dcde5d7c98216d45ff18d656cfe8d7e1057f79b038ce49cfab616d6a0b7fc14')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=9dcde5d7c98216d45ff18d656cfe8d7e1057f79b038ce49cfab616d6a0b7fc14&page_size=20')
+
+    def test_color_txs(self):
+        base_url = '/explorer/v1/transactions/color/0'
+        url = base_url + '?page_size=20'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 20)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '7fb50dd5ff00d6a929ef39f51e7821ce78d141f6d45e7d93918cd5811acaa36b')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '9dcde5d7c98216d45ff18d656cfe8d7e1057f79b038ce49cfab616d6a0b7fc14')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=9dcde5d7c98216d45ff18d656cfe8d7e1057f79b038ce49cfab616d6a0b7fc14&page_size=20')
 
 
 class GetAddressUtxoTest(TestCase):
