@@ -211,8 +211,8 @@ class CreateSmartContractRawTxTest(TestCase):
             },
         ]
         self.sample_params = {
-            'address': '13nf9WjwBWY5LY8yxVfmuDPtpowNgPTqNW',
-            'oracles_multisig_address': '3FUvnrSFBwUwGKDHN7wuxe3A1yfPkiHUXP',
+            'from_address': '13nf9WjwBWY5LY8yxVfmuDPtpowNgPTqNW',
+            'to_address': '3FUvnrSFBwUwGKDHN7wuxe3A1yfPkiHUXP',
             'code': 'this is code.........',
             'contract_fee': 1,
         }
@@ -225,7 +225,7 @@ class CreateSmartContractRawTxTest(TestCase):
         self.assertIn('raw_tx', response.json())
 
     def test_miss_field_form(self):
-        required_field = ['address', 'oracles_multisig_address', 'code']
+        required_field = ['from_address', 'to_address', 'code']
         for field in required_field:
             miss_field_params = dict(self.sample_params)
             del miss_field_params[field]
@@ -235,7 +235,17 @@ class CreateSmartContractRawTxTest(TestCase):
     @mock.patch('base.v1.views.get_rpc_connection')
     def test_balance_not_enough(self, mock_rpc):
         mock_rpc().gettxoutaddress.return_value = None
-        
+
+        response = self.client.post(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+    def test_missing_color_id(self):
+        self.sample_params['amount'] = 9487
+        response = self.client.post(self.url, self.sample_params)
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+    def test_missing_amount(self):
+        self.sample_params['color_id'] = 9487
         response = self.client.post(self.url, self.sample_params)
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
