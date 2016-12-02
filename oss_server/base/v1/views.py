@@ -132,20 +132,39 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
     def post(self, request, *args, **kwargs):
         form = CreateSmartContractRawTxForm(request.POST)
         if form.is_valid():
-            address = form.cleaned_data['address']
-            oracles_multisig_address = form.cleaned_data['oracles_multisig_address']
+            from_address = form.cleaned_data['from_address']
+            to_address = form.cleaned_data['to_address']
+            color_id = form.cleaned_data['color_id']
+            amount = form.cleaned_data['amount']
             code = form.cleaned_data['code']
             contract_fee = form.cleaned_data['contract_fee'] or self.DEFAULT_CONTRACT_FEE
 
-            utxos = get_rpc_connection().gettxoutaddress(address)
+            utxos = get_rpc_connection().gettxoutaddress(from_address)
             total_fee = contract_fee + self.TX_FEE
-            inputs = select_utxo(utxos=utxos, color=self.FEE_COLOR, sum=total_fee)
-            if not inputs:
+
+            if color_id and amount:
+                inputs = select_utxo(utxos=utxos, color=color_id, sum=amount)
+                if not inputs:
+                    return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+            else:
+                inputs = []
+
+            fee_inputs = select_utxo(utxos=utxos, color=self.FEE_COLOR, sum=total_fee)
+            if not fee_inputs:
                 return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
 
-            ins = [utxo_to_txin(utxo) for utxo in inputs]
+            ins = [utxo_to_txin(utxo) for utxo in (inputs + fee_inputs)]
 
-            outs = self._build_txouts(address, oracles_multisig_address, code, contract_fee, inputs)
+            outs = []
+            if color_id and amount:
+                change = balance_from_utxos(inputs)[color_id] - amount
+                if change:
+                    outs.append({
+                        'address': from_address,
+                        'value': int(change * (10**8)),
+                        'color': color_id
+                    })
+            outs += self._build_txouts(from_address, to_address, code, contract_fee, fee_inputs)
 
             raw_tx = make_raw_tx(ins, outs, self.TX_CONTRACT_TYPE)
             return JsonResponse({'raw_tx': raw_tx})
@@ -154,10 +173,10 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
 
-    def _build_txouts(self, address, oracles_multisig_address, code, contract_fee, utxo_inputs):
+    def _build_txouts(self, from_address, to_address, code, contract_fee, utxo_inputs):
         outs = [
             {
-                'address': oracles_multisig_address,
+                'address': to_address,
                 'value': int(contract_fee * (10**8)),
                 'color': self.FEE_COLOR
             },
@@ -171,7 +190,7 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
         change = balance_from_utxos(utxo_inputs)[self.FEE_COLOR] - contract_fee - self.TX_FEE
         if change:
             outs.append({
-                'address': address,
+                'address': from_address,
                 'value': int(change * (10**8)),
                 'color': self.FEE_COLOR
             })
