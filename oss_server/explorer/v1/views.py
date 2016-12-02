@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import View
 
+from ..models import *
 from ..pagination import *
 
 
@@ -47,20 +48,23 @@ class GetTxByHashView(View):
 class GetColorTxsView(View):
     def get(self, request, color_id):
         starting_after = request.GET.get('starting_after', None)
+        page_size = request.GET.get('page_size', 50)
 
+        # tx should be NORMAL / MINT type and in main chain, and distinct() prevents duplicate object
         Q1 = Q(tx_in__txout__color=color_id)
         Q2 = Q(tx_out__color=color_id)
-        # tx should be NORMAL / MINT type and should be in main chain, and distinct() prevents duplicate object
         tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
 
         try:
-            page, txs = tx_pagination(tx_list, starting_after)
-        except TxNotFoundException:
+            page, txs = tx_pagination(tx_list, starting_after, int(page_size))
+        except Tx.DoesNotExist:
             response = {'error': 'tx not exist'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
         if len(txs) > 0 and txs.has_next():
-            page['next_uri'] = '/explorer/v1/transactions/color/' + color_id + '?starting_after=' + txs[-1].hash
+            query_dict = request.GET.copy()
+            query_dict['starting_after'] = txs[-1].hash
+            page['next_uri'] = '/explorer/v1/transactions/color/' + color_id + '?' + query_dict.urlencode()
 
         response = {
             'page': page,
@@ -75,6 +79,7 @@ class GetAddressTxsView(View):
         tx_type = request.GET.get('tx_type', None)
         since = request.GET.get('since', None)
         until = request.GET.get('until', None)
+        page_size = request.GET.get('page_size', 50)
 
         # tx should be in main chain, and distinct() prevents duplicate object
         Q1 = Q(tx_in__txout__address__address=address)
@@ -91,18 +96,15 @@ class GetAddressTxsView(View):
             tx_list = tx_list.filter(time__lte=until)
 
         try:
-            page, txs = tx_pagination(tx_list, starting_after)
-        except TxNotFoundException:
+            page, txs = tx_pagination(tx_list, starting_after, int(page_size))
+        except Tx.DoesNotExist:
             response = {'error': 'tx not exist'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
         if len(txs) > 0 and txs.has_next():
-            page['next_uri'] = '/explorer/v1/transactions/address/' + address + '?starting_after=' + txs[-1].hash
-            if tx_type:
-                page['next_uri'] += '&tx_type=' + tx_type
-            if since:
-                page['next_uri'] += '&since=' + since
-
+            query_dict = request.GET.copy()
+            query_dict['starting_after'] = txs[-1].hash
+            page['next_uri'] = '/explorer/v1/transactions/address/' + address + '?' + query_dict.urlencode()
 
         response = {
             'page': page,
