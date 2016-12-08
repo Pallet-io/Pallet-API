@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import View
 
+from .forms import GetAddressTxsForm, GetColorTxsForm
 from ..models import *
 from ..pagination import *
 
@@ -47,70 +48,82 @@ class GetTxByHashView(View):
 
 class GetColorTxsView(View):
     def get(self, request, color_id):
-        starting_after = request.GET.get('starting_after', None)
-        page_size = request.GET.get('page_size', 50)
+        form = GetColorTxsForm(request.GET)
+        if form.is_valid():
+            starting_after = form.cleaned_data['starting_after']
+            page_size = form.cleaned_data['page_size'] or 50
 
-        # tx should be NORMAL / MINT type and in main chain, and distinct() prevents duplicate object
-        Q1 = Q(tx_in__txout__color=color_id)
-        Q2 = Q(tx_out__color=color_id)
-        tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
+            # tx should be NORMAL / MINT type and in main chain, and distinct() prevents duplicate object
+            Q1 = Q(tx_in__txout__color=color_id)
+            Q2 = Q(tx_out__color=color_id)
+            tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
 
-        try:
-            page, txs = tx_pagination(tx_list, starting_after, int(page_size))
-        except Tx.DoesNotExist:
-            response = {'error': 'tx not exist'}
-            return JsonResponse(response, status=httplib.NOT_FOUND)
+            try:
+                page, txs = tx_pagination(tx_list, starting_after, page_size)
+            except Tx.DoesNotExist:
+                response = {'error': 'tx not exist'}
+                return JsonResponse(response, status=httplib.NOT_FOUND)
 
-        if len(txs) > 0 and txs.has_next():
-            query_dict = request.GET.copy()
-            query_dict['starting_after'] = txs[-1].hash
-            page['next_uri'] = '/explorer/v1/transactions/color/' + color_id + '?' + query_dict.urlencode()
+            if len(txs) > 0 and txs.has_next():
+                query_dict = request.GET.copy()
+                query_dict['starting_after'] = txs[-1].hash
+                page['next_uri'] = '/explorer/v1/transactions/color/' + color_id + '?' + query_dict.urlencode()
 
-        response = {
-            'page': page,
-            'txs': [tx.as_dict() for tx in txs]
-        }
-        return JsonResponse(response)
+            response = {
+                'page': page,
+                'txs': [tx.as_dict() for tx in txs]
+            }
+            return JsonResponse(response)
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
 
 
 class GetAddressTxsView(View):
     def get(self, request, address):
-        starting_after = request.GET.get('starting_after', None)
-        tx_type = request.GET.get('tx_type', None)
-        since = request.GET.get('since', None)
-        until = request.GET.get('until', None)
-        page_size = request.GET.get('page_size', 50)
+        form = GetAddressTxsForm(request.GET)
+        if form.is_valid():
+            starting_after = form.cleaned_data['starting_after']
+            tx_type = form.cleaned_data['tx_type']
+            since = form.cleaned_data['since']
+            until = form.cleaned_data['until']
+            page_size = form.cleaned_data['page_size'] or 50
 
-        # tx should be in main chain, and distinct() prevents duplicate object
-        Q1 = Q(tx_in__txout__address__address=address)
-        Q2 = Q(tx_out__address__address=address)
-        tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
+            # tx should be in main chain, and distinct() prevents duplicate object
+            Q1 = Q(tx_in__txout__address__address=address)
+            Q2 = Q(tx_out__address__address=address)
+            tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
 
-        if tx_type:
-            tx_list = tx_list.filter(type=tx_type)
+            if tx_type is not None:
+                tx_list = tx_list.filter(type=tx_type)
 
-        if since:
-            tx_list = tx_list.filter(time__gte=since)
+            if since is not None:
+                tx_list = tx_list.filter(time__gte=since)
 
-        if until:
-            tx_list = tx_list.filter(time__lte=until)
+            if until is not None:
+                tx_list = tx_list.filter(time__lte=until)
 
-        try:
-            page, txs = tx_pagination(tx_list, starting_after, int(page_size))
-        except Tx.DoesNotExist:
-            response = {'error': 'tx not exist'}
-            return JsonResponse(response, status=httplib.NOT_FOUND)
+            try:
+                page, txs = tx_pagination(tx_list, starting_after, page_size)
+            except Tx.DoesNotExist:
+                response = {'error': 'tx not exist'}
+                return JsonResponse(response, status=httplib.NOT_FOUND)
 
-        if len(txs) > 0 and txs.has_next():
-            query_dict = request.GET.copy()
-            query_dict['starting_after'] = txs[-1].hash
-            page['next_uri'] = '/explorer/v1/transactions/address/' + address + '?' + query_dict.urlencode()
+            if len(txs) > 0 and txs.has_next():
+                query_dict = request.GET.copy()
+                query_dict['starting_after'] = txs[-1].hash
+                page['next_uri'] = '/explorer/v1/transactions/address/' + address + '?' + query_dict.urlencode()
 
-        response = {
-            'page': page,
-            'txs': [tx.as_dict() for tx in txs]
-        }
-        return JsonResponse(response)
+            response = {
+                'page': page,
+                'txs': [tx.as_dict() for tx in txs]
+            }
+            return JsonResponse(response)
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
 
 
 class GetAddressBalanceView(View):

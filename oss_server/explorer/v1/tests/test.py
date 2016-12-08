@@ -291,7 +291,7 @@ class GetColorTxsTest(TestCase):
         self.assertEqual(response.json()['page']['next_uri'], None)
 
     def test_tx_not_found(self):
-        url = '/explorer/v1/transactions/color/1?starting_after=abc'
+        url = '/explorer/v1/transactions/color/1?starting_after=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
         self.assertEqual(response.json(), {'error': 'tx not exist'})
@@ -553,7 +553,7 @@ class GetAddressTxsTest(TestCase):
         self.assertEqual(response.json()['page']['next_uri'], None)
 
     def test_tx_not_found(self):
-        url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3Laaaaaa?starting_after=abc'
+        url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3Laaaaaa?starting_after=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
         self.assertEqual(response.json(), {'error': 'tx not exist'})
