@@ -6,6 +6,15 @@ from .models import Tx
 
 
 def tx_pagination(tx_list, starting_after=None, per_page=50):
+    """
+    Paginate a given transaction list. `Tx.DoesNotExist` exception would be raised if the given transaction hash in
+    `starting_after` is not found.
+
+    :param tx_list: A list of transactions
+    :param starting_after: Transaction hash
+    :param per_page: The page size
+    :return: (page, txs). page is the pagination info. txs is the queried transactions.
+    """
     pk = None
     time = None
     if starting_after:
