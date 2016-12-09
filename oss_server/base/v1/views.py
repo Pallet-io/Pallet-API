@@ -157,6 +157,11 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
 
             outs = []
             if color_id and amount:
+                outs.append({
+                    'address': to_address,
+                    'value': int(amount * (10**8)),
+                    'color': color_id
+                })
                 change = balance_from_utxos(inputs)[color_id] - amount
                 if change:
                     outs.append({
