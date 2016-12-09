@@ -594,7 +594,7 @@ class GetAddressUtxoTest(TestCase):
         url = '/explorer/v1/addresses/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY/utxos'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
-        self.assertEqual(len(response.json()['utxo']), 12)
+        self.assertEqual(len(response.json()['utxo']), 6)
 
     def test_address_no_ntux(self):
         url = '/explorer/v1/addresses/1FPWFMPvYNTBx3fJYVmbFyhKtfi4aaaaaa/utxos'
@@ -609,8 +609,8 @@ class GetAddressBalanceTest(TestCase):
         url = '/explorer/v1/addresses/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY/balances'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
-        self.assertEqual(int(response.json().get('1')), 3820400000000)
-        self.assertEqual(int(response.json().get('2')), 482100000000)
+        self.assertEqual(int(response.json().get('1')), 2700300000000)
+        self.assertEqual(int(response.json().get('2')), 482000000000)
 
     def test_address_no_balance(self):
         url = '/explorer/v1/addresses/1FPWFMPvYNTBx3fJYVmbFyhKtfi4aaaaaa/balances'

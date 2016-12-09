@@ -128,7 +128,9 @@ class GetAddressTxsView(View):
 
 class GetAddressBalanceView(View):
     def get(self, request, address):
-        utxo_list = TxOut.objects.filter(address__address=address, spent=0)
+        normal_type = Q(tx__type=0)
+        contract_type = Q(tx__type=5)
+        utxo_list = TxOut.objects.filter(normal_type | contract_type, address__address=address, spent=0)
 
         response = {}
         for utxo in utxo_list:
@@ -140,7 +142,9 @@ class GetAddressBalanceView(View):
 
 class GetAddressUtxoView(View):
     def get(self, request, address):
-        utxo_list = TxOut.objects.filter(address__address=address, spent=0)
+        normal_type = Q(tx__type=0)
+        contract_type = Q(tx__type=5)
+        utxo_list = TxOut.objects.filter(normal_type | contract_type, address__address=address, spent=0)
 
         response = {'utxo': [utxo.utxo_dict() for utxo in utxo_list]}
         return JsonResponse(response)
