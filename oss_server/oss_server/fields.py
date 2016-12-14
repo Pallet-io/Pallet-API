@@ -6,7 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 
 import gcoin
 
-__all__ = ('AddressField', 'ColorField', 'MintAmountField', 'TxAmountField')
+__all__ = ('AddressField', 'ColorField', 'MintAmountField', 'PubkeyField', 'TxAmountField')
 
 
 def address_validator(value):
@@ -20,6 +20,16 @@ def address_validator(value):
     try:
         gcoin.b58check_to_hex(value)
     except AssertionError:
+        raise error
+
+
+def pubkey_validator(value):
+    error = ValidationError(
+        _('%(pubkey)s is not a valid public key'),
+        code='invalid',
+        params={'pubkey': value}
+    )
+    if not gcoin.is_pubkey(value):
         raise error
 
 
@@ -37,6 +47,12 @@ class ColorField(forms.IntegerField):
 class MintAmountField(forms.IntegerField):
     def __init__(self, *args, **kwargs):
         super(MintAmountField, self).__init__(max_value=10**10, min_value=1, *args, **kwargs)
+
+
+class PubkeyField(forms.CharField):
+    def __init__(self, *args, **kwargs):
+        super(PubkeyField, self).__init__(*args, **kwargs)
+        self.validators.append(pubkey_validator)
 
 
 class TxAmountField(forms.DecimalField):

@@ -308,11 +308,11 @@ class CreateMintRawTxView(View):
     def get(self, request, *args, **kwargs):
         form = MintRawTxForm(request.GET)
         if form.is_valid():
-            mint_address = form.cleaned_data['mint_address']
+            mint_pubkey = form.cleaned_data['mint_pubkey']
             color_id = form.cleaned_data['color_id']
             amount = form.cleaned_data['amount']
 
-            raw_tx = make_mint_raw_tx(mint_address, color_id, int(amount * 10**8))
+            raw_tx = make_mint_raw_tx(mint_pubkey, color_id, int(amount * 10**8))
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
