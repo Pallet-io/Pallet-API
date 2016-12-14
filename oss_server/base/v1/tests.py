@@ -413,10 +413,10 @@ class CreateMintRawTxTest(TestCase):
 
     def setUp(self):
         self.url = '/base/v1/mint/prepare'
-        self.mint_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
+        self.mint_pubkey = '043ecd74acb606a5bb7f5fdb1537b36995cc0eb1efa59ca209a974e980837a0c3a7d82d2065881ef1775a9234292dcbb0e72991e95dc4fab0171c319f7213fcd8f'
 
     def test_create_raw_tx_using_color1(self):
-        response = self.client.get(self.url, {'mint_address': self.mint_address,
+        response = self.client.get(self.url, {'mint_pubkey': self.mint_pubkey,
                                               'color_id': 1,
                                               'amount': 1})
         self.assertEqual(response.status_code, httplib.OK)

@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from oss_server.fields import AddressField, ColorField, MintAmountField, TxAmountField
+from oss_server.fields import AddressField, ColorField, MintAmountField, PubkeyField, TxAmountField
 
 
 class CreateLicenseRawTxForm(forms.Form):
@@ -124,9 +124,9 @@ class RawTxForm(forms.Form):
 
 
 class MintRawTxForm(forms.Form):
-    mint_address = AddressField(error_messages={
-        'required': '`mint_address` is required',
-        'invalid': '`mint_address` is not an address'
+    mint_pubkey = PubkeyField(error_messages={
+        'required': '`mint_pubkey` is required',
+        'invalid': '`mint_pubkey` is not a public key'
     })
     color_id = ColorField(error_messages={
         'required': '`color_id` is required',
