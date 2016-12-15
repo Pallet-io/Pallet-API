@@ -18,7 +18,7 @@ def tx_pagination(tx_list, starting_after=None, per_page=50):
     pk = None
     time = None
     if starting_after:
-        tx = Tx.objects.get(hash=starting_after)
+        tx = Tx.objects.get(hash=starting_after, block__in_longest=1)
         pk = tx.pk
         time = tx.time
 
