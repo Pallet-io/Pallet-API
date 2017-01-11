@@ -241,7 +241,7 @@ class GetColorTxsTest(TestCase):
             self.assertTrue(check)
             self.assertTrue(tx['type'] == 'NORMAL' or tx['type'] == 'MINT')
 
-    def test_page_with_param(self):
+    def test_page_with_starting_tx(self):
         # color 1
         base_url = '/explorer/v1/transactions/color/1'
 
@@ -271,6 +271,67 @@ class GetColorTxsTest(TestCase):
         self.assertEqual(response.json()['page']['starting_after'], None)
         self.assertEqual(response.json()['page']['ending_before'], None)
         self.assertEqual(response.json()['page']['next_uri'], None)
+
+    def test_color_txs_with_since_until(self):
+        # color 1
+        base_url = '/explorer/v1/transactions/color/1'
+
+        # since: 04 Aug 2016 15:55:58 GMT
+        url = base_url + '?since=1470326158'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 3)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '7b641d130b2348c1262bceb0dba586f475b0ff07f2eba37e3f71bcfcf0e7e7ca')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         'f4fc993c47128af9fc692dd925fbc467cfa5fbc50c795f88aae5b3c421057221')
+        self.assertEqual(response.json()['page']['next_uri'], None)
+        for tx in response.json()['txs']:
+            self.assertGreaterEqual(int(tx['time']), 1470326158)
+
+        # until: 10 Aug 2016 08:01:59 GMT
+        url = base_url + '?until=1470816119'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 16)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '7b641d130b2348c1262bceb0dba586f475b0ff07f2eba37e3f71bcfcf0e7e7ca')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         'af7368bdaee21d544e90e81589e959838c72320f0a292ee5e93a04a2600c958b')
+        self.assertEqual(response.json()['page']['next_uri'], None)
+        for tx in response.json()['txs']:
+            self.assertLessEqual(int(tx['time']), 1470816119)
+
+        # both
+        url = base_url + '?since=1470326158&until=1470816119'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 3)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '7b641d130b2348c1262bceb0dba586f475b0ff07f2eba37e3f71bcfcf0e7e7ca')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         'f4fc993c47128af9fc692dd925fbc467cfa5fbc50c795f88aae5b3c421057221')
+        self.assertEqual(response.json()['page']['next_uri'], None)
+        for tx in response.json()['txs']:
+            self.assertGreaterEqual(int(tx['time']), 1470326158)
+            self.assertLessEqual(int(tx['time']), 1470816119)
+
+    def test_color_txs_with_all_params(self):
+        # color 1
+        base_url = '/explorer/v1/transactions/color/1'
+
+        url = base_url + '?since=1470326158&until=1470816119&starting_after=9e3c6460b95fea0083f9eb8b0970075e2c12bf2b9e74ca72ce2a85bb3a45dedb'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['txs']), 1)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         'f4fc993c47128af9fc692dd925fbc467cfa5fbc50c795f88aae5b3c421057221')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         'f4fc993c47128af9fc692dd925fbc467cfa5fbc50c795f88aae5b3c421057221')
+        self.assertEqual(response.json()['page']['next_uri'], None)
+        for tx in response.json()['txs']:
+            self.assertGreaterEqual(int(tx['time']), 1470326158)
+            self.assertLessEqual(int(tx['time']), 1470816119)
 
     def test_color_without_tx(self):
         # color 4
@@ -473,11 +534,11 @@ class GetAddressTxsTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json()['page']['starting_after'],
-                         'ca6d14f6174df15bf9d96768c46019ba7dfcccbe6bab5be02d0c3309c319e89b')
+                         '787dd2b0f30ac0466ba8fedbe27d10067ea8fcaea6febace19c5bf5fc584b42c')
         self.assertEqual(response.json()['page']['ending_before'],
-                         '6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856')
+                         'd298c17da06d0116072f334bd256458745dc001d0a09842bfa23acf7e91bb0b0')
         self.assertEqual(response.json()['page']['next_uri'],
-                         base_url + '?starting_after=6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856&until=1470816119')
+                         base_url + '?starting_after=d298c17da06d0116072f334bd256458745dc001d0a09842bfa23acf7e91bb0b0&until=1470816119')
         for tx in response.json()['txs']:
             self.assertLessEqual(int(tx['time']), 1470816119)
 
@@ -487,11 +548,11 @@ class GetAddressTxsTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(len(response.json()['txs']), 50)
         self.assertEqual(response.json()['page']['starting_after'],
-                         'ca6d14f6174df15bf9d96768c46019ba7dfcccbe6bab5be02d0c3309c319e89b')
+                         '787dd2b0f30ac0466ba8fedbe27d10067ea8fcaea6febace19c5bf5fc584b42c')
         self.assertEqual(response.json()['page']['ending_before'],
-                         '6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856')
+                         'd298c17da06d0116072f334bd256458745dc001d0a09842bfa23acf7e91bb0b0')
         self.assertEqual(response.json()['page']['next_uri'],
-                         base_url + '?starting_after=6b962002a4f2e3724fab4e8757d97e6ed6405c5e5fb2551806a77c10cd728856&since=1470326158&until=1470816119')
+                         base_url + '?starting_after=d298c17da06d0116072f334bd256458745dc001d0a09842bfa23acf7e91bb0b0&since=1470326158&until=1470816119')
         for tx in response.json()['txs']:
             self.assertGreaterEqual(int(tx['time']), 1470326158)
             self.assertLessEqual(int(tx['time']), 1470816119)

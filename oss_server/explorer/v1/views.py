@@ -51,12 +51,20 @@ class GetColorTxsView(View):
         form = GetColorTxsForm(request.GET)
         if form.is_valid():
             starting_after = form.cleaned_data['starting_after']
+            since = form.cleaned_data['since']
+            until = form.cleaned_data['until']
             page_size = form.cleaned_data['page_size'] or 50
 
             # tx should be NORMAL / MINT type and in main chain, and distinct() prevents duplicate object
             Q1 = Q(tx_in__txout__color=color_id)
             Q2 = Q(tx_out__color=color_id)
             tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
+
+            if since is not None:
+                tx_list = tx_list.filter(time__gte=since)
+
+            if until is not None:
+                tx_list = tx_list.filter(time__lt=until)
 
             try:
                 page, txs = tx_pagination(tx_list, starting_after, page_size)
@@ -102,7 +110,7 @@ class GetAddressTxsView(View):
                 tx_list = tx_list.filter(time__gte=since)
 
             if until is not None:
-                tx_list = tx_list.filter(time__lte=until)
+                tx_list = tx_list.filter(time__lt=until)
 
             try:
                 page, txs = tx_pagination(tx_list, starting_after, page_size)
