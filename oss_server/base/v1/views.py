@@ -349,3 +349,10 @@ class CreateLicenseTransferRawTxView(View):
             if utxo['color'] == color:
                 return utxo
         return None
+
+
+class UtxoView(View):
+
+    def get(self, request, address, *args, **kwargs):
+        utxos = get_rpc_connection().gettxoutaddress(address)
+        return JsonResponse(utxos, safe=False)
