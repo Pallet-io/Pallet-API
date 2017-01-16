@@ -240,7 +240,7 @@ class txOutput:
 
     @property
     def address(self):
-        return pubkeyToAddress(hashStr(self.pubkey))
+        return addressFromScriptPubKey(hashStr(self.pubkey))
 
     def toString(self):
         print "--------------TX OUT------------------------"
