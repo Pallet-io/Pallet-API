@@ -64,6 +64,7 @@ def intLE(num):
 
 def addressFromScriptPubKey(script_pub_key):
     script_pub_key = script_pub_key.lower()
+    version_prefix = b'\x00'
     # pay to pubkey hash
     if pubkey_hash_re.match(script_pub_key):
         pubkey_hash = binascii.unhexlify(script_pub_key[6:-4])
@@ -74,10 +75,11 @@ def addressFromScriptPubKey(script_pub_key):
     # pay to script hash
     elif script_hash_re.match(script_pub_key):
         pubkey_hash = binascii.unhexlify(script_pub_key[4:-2])
+        version_prefix = b'\x05'
     else:
         return ''
 
-    padded = (b'\x00') + pubkey_hash
+    padded = version_prefix + pubkey_hash
     hash2 = hashlib.sha256(padded)
     hash3 = hashlib.sha256(hash2.digest())
     padded += hash3.digest()[:4]
