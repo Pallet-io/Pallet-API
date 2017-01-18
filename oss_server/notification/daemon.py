@@ -207,6 +207,9 @@ class AddressNotifyDaemon(GcoinRPCMixin):
             # get new blocks since last round
             new_blocks = self.get_new_blocks()
 
+            if not new_blocks:
+                continue
+
             # create a address -> txs map from new blocks
             addr_txs_map = self.create_address_txs_map(new_blocks)
 
@@ -305,11 +308,8 @@ class AddressNotifyDaemon(GcoinRPCMixin):
         return tx.vout[n]
 
     def get_address_from_vout(self, vout):
-        scriptPubKey = vout['scriptPubKey']
-        if scriptPubKey['type'] == 'pubkey' or scriptPubKey['type'] == 'pubkeyhash':
-            return scriptPubKey['addresses']
-        else:
-            return []
+        script_pub_key = vout['scriptPubKey']
+        return script_pub_key.get('addresses', [])
 
     def set_last_seen_block(self, block_hash):
         LastSeenBlock.objects.create(name='AddressNotifyDaemon', block_hash=block_hash)
