@@ -5,6 +5,8 @@ from .v1.views import *
 urlpatterns = [
     url('^v1/addresses/(?P<address>[a-zA-Z0-9]+)/utxo$', UtxoView.as_view()),
     url('^v1/balance/(?P<address>[a-zA-Z0-9]+)$', GetBalanceView.as_view()),
+    url('^v1/general-transaction/prepare$', GeneralTxView.as_view()),
+    url('^v1/general-transaction/send$', SendRawTxView.as_view()),
     url('^v1/license/(?P<color_id>\d+)$', GetLicenseInfoView.as_view()),
     url('^v1/license/prepare', CreateLicenseRawTxView.as_view()),
     url('^v1/license/transfer/prepare$', CreateLicenseTransferRawTxView.as_view()),
