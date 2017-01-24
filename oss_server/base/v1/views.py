@@ -1,7 +1,9 @@
 import httplib
+import json
 import logging
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -10,6 +12,8 @@ from gcoin import (encode_license, make_mint_raw_tx, make_raw_tx,
                    mk_op_return_script)
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
+
+from oss_server.utils import address_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
 from .forms import (CreateLicenseRawTxForm, CreateLicenseTransferRawTxForm,
@@ -356,3 +360,117 @@ class UtxoView(View):
     def get(self, request, address, *args, **kwargs):
         utxos = get_rpc_connection().gettxoutaddress(address)
         return JsonResponse(utxos, safe=False)
+
+
+class GeneralTxView(CsrfExemptMixin, View):
+    http_method_names = ['post']
+
+    @staticmethod
+    def _validate_json_obj(json_obj):
+        if len(json_obj['tx_info']) < 1:
+            return '`tx_info` does not have any item'
+
+        tx_info_key_set = {'from_address', 'to_address', 'color_id', 'amount'}
+        for tx_info in json_obj['tx_info']:
+            if not tx_info_key_set <= set(tx_info.keys()):
+                return 'objects in `tx_info` should contain keys `from_address`, `to_address`, `color_id`, `amount`'
+            try:
+                address_validator(tx_info['from_address'])
+            except ValidationError:
+                return 'invalid address {}'.format(tx_info['from_address'])
+            try:
+                address_validator(tx_info['to_address'])
+            except ValidationError:
+                return 'invalid address {}'.format(tx_info['to_address'])
+            tx_info['color_id'] = int(tx_info['color_id'])
+            tx_info['amount'] = int(tx_info['amount'])
+
+    @staticmethod
+    def _aggregate_inputs(tx_info_list):
+        tx_info_in = {}
+
+        for tx_info in tx_info_list:
+            addr_in = tx_info_in.setdefault(tx_info['from_address'], {})
+            color_in = addr_in.setdefault(tx_info['color_id'], 0)
+            color_in += tx_info['amount']
+
+        return tx_info_in
+
+    @staticmethod
+    def _aggregate_outputs(tx_info_list):
+        tx_info_out = {}
+
+        for tx_info in tx_info_list:
+            addr_in = tx_info_out.setdefault(tx_info['to_address'], {})
+            color_in = addr_in.setdefault(tx_info['color_id'], 0)
+            color_in += tx_info['amount']
+
+        return tx_info_out
+
+    def post(self, request, *args, **kwargs):
+        try:
+            json_obj = json.loads(request.body)
+            error_msg = self._validate_json_obj(json_obj)
+        except:
+            return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
+        else:
+            if error_msg:
+                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+
+        tx_info_ins = self._aggregate_inputs(json_obj['tx_info'])
+        tx_info_outs = self._aggregate_outputs(json_obj['tx_info'])
+
+        tx_vins = []
+        tx_vouts = []
+        fee_included = False
+        fee_address = json_obj['tx_info'][0]['from_address']
+
+        for from_address, color_amount_map in tx_info_ins.items():
+            utxos = get_rpc_connection().gettxoutaddress(from_address)
+
+            for color_id, amount in color_amount_map.items():
+                vins = select_utxo(utxos=utxos, color=color_id, sum=amount)
+                if not vins:
+                    error_msg = 'insufficient color {} in address {}'.format(color_id, from_address)
+                    return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+
+                change = balance_from_utxos(vins)[color_id] - amount
+
+                if from_address == fee_address and color_id == 1:
+                    vins = select_utxo(utxos=utxos, color=color_id, sum=amount+1)
+                    if not vins:
+                        error_msg = 'insufficient fee in address {}'.format(from_address)
+                        return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+                    fee_included = True
+                    change -= 1
+
+                tx_vins.append([utxo_to_txin(utxo) for utxo in vins])
+
+                if change:
+                    tx_vouts.append({'address': from_address,
+                                     'value': int(change * 10**8),
+                                     'color': color_id})
+
+        if not fee_included:
+            utxos = get_rpc_connection().gettxoutaddress(fee_address)
+
+            vins = select_utxo(utxos=utxos, color=1, sum=1)
+            if not vins:
+                error_msg = 'insufficient fee in address {}'.format(fee_address)
+                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+            tx_vins += [utxo_to_txin(utxo) for utxo in vins]
+
+            change = balance_from_utxos(vins)[1] - 1
+            if change:
+                tx_vouts.append({'address': fee_address,
+                                 'value': int(change * 10**8),
+                                 'color': 1})
+
+        for to_address, color_amount_map in tx_info_outs.items():
+            for color_id, amount in color_amount_map.items():
+                tx_vouts.append({'address': to_address,
+                                 'value': int(amount * 10**8),
+                                 'color': color_id})
+
+        raw_tx = make_raw_tx(tx_vins, tx_vouts)
+        return JsonResponse({'raw_tx': raw_tx})
