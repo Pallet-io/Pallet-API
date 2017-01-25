@@ -444,7 +444,7 @@ class GeneralTxView(CsrfExemptMixin, View):
                     fee_included = True
                     change -= 1
 
-                tx_vins.append([utxo_to_txin(utxo) for utxo in vins])
+                tx_vins += [utxo_to_txin(utxo) for utxo in vins]
 
                 if change:
                     tx_vouts.append({'address': from_address,
