@@ -302,7 +302,10 @@ class SendRawTxView(CsrfExemptMixin, View):
 class GetBalanceView(View):
 
     def get(self, request, address, *args, **kwargs):
-        utxos = get_rpc_connection().gettxoutaddress(address)
+        if request.GET.get('confirmed') == '1':
+            utxos = get_rpc_connection().gettxoutaddress(address, mempool=False)
+        else:
+            utxos = get_rpc_connection().gettxoutaddress(address)
         balance_dict = balance_from_utxos(utxos)
         return JsonResponse(balance_dict)
 
