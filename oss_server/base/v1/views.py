@@ -1,3 +1,4 @@
+from decimal import Decimal
 import httplib
 import json
 import logging
@@ -386,16 +387,20 @@ class GeneralTxView(CsrfExemptMixin, View):
             except ValidationError:
                 return 'invalid address {}'.format(tx_info['to_address'])
             tx_info['color_id'] = int(tx_info['color_id'])
-            tx_info['amount'] = int(tx_info['amount'])
+            tx_info['amount'] = Decimal(tx_info['amount'])
 
     @staticmethod
     def _aggregate_inputs(tx_info_list):
         tx_info_in = {}
 
         for tx_info in tx_info_list:
-            addr_in = tx_info_in.setdefault(tx_info['from_address'], {})
-            color_in = addr_in.setdefault(tx_info['color_id'], 0)
-            color_in += tx_info['amount']
+            from_address = tx_info['from_address']
+            color_id = tx_info['color_id']
+
+            addr_in = tx_info_in.setdefault(from_address, {})
+            if color_id not in addr_in:
+                addr_in[color_id] = 0
+            addr_in[color_id] += tx_info['amount']
 
         return tx_info_in
 
@@ -404,9 +409,13 @@ class GeneralTxView(CsrfExemptMixin, View):
         tx_info_out = {}
 
         for tx_info in tx_info_list:
-            addr_in = tx_info_out.setdefault(tx_info['to_address'], {})
-            color_in = addr_in.setdefault(tx_info['color_id'], 0)
-            color_in += tx_info['amount']
+            to_address = tx_info['to_address']
+            color_id = tx_info['color_id']
+
+            addr_in = tx_info_out.setdefault(to_address, {})
+            if color_id not in addr_in:
+                addr_in[color_id] = 0
+            addr_in[color_id] += tx_info['amount']
 
         return tx_info_out
 
@@ -445,7 +454,7 @@ class GeneralTxView(CsrfExemptMixin, View):
                         error_msg = 'insufficient fee in address {}'.format(from_address)
                         return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
                     fee_included = True
-                    change -= 1
+                    change = balance_from_utxos(vins)[color_id] - (amount + 1)
 
                 tx_vins += [utxo_to_txin(utxo) for utxo in vins]
 
