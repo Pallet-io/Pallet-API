@@ -47,6 +47,13 @@ class Block(models.Model):
             return int(max_height - self.height)
 
     @property
+    def difficulty(self):
+        # from bits to difficulty reference: https://en.bitcoin.it/wiki/Difficulty
+        difficulty_1_target = 0x00ffff * 2 ** (8 * (0x1d - 3))
+        current_target = (int(self.bits) % 0x1000000) * 2 ** (8 * (int(self.bits) / 0xffffff - 3))
+        return difficulty_1_target / float(current_target)
+
+    @property
     def branch(self):
         return 'main' if self.in_longest else 'orphan'
 
@@ -76,6 +83,8 @@ class Block(models.Model):
             ('branch', self.branch),
             ('size', self.size),
             ('chain_work', self.chain_work),
+            ('confirmation', self.confirmation),
+            ('difficulty', self.difficulty),
             ('transaction_count', self.tx_count),
             ('transaction_hashes', self.transaction_hashes),
         ])
@@ -115,6 +124,7 @@ class Tx(models.Model):
             ('locktime', self.locktime),
             ('type', self.TX_TYPE[int(self.type)]),
             ('time', self.time),
+            ('confirmation', self.block.confirmation),
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
             ('vouts', [vout.as_dict() for vout in self.tx_outs.all()]),
         ])
