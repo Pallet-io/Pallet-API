@@ -4,16 +4,50 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import View
 
-from .forms import GetAddressTxsForm, GetColorTxsForm
+from .forms import GetAddressTxsForm, GetBlocksForm, GetColorTxsForm
 from ..models import *
 from ..pagination import *
 
 
-class GetLatestBlocksView(View):
+class GetBlocksView(View):
     def get(self, request):
-        latest_blocks = Block.objects.filter(in_longest=1)[:50]
-        response = {'blocks': [block.as_dict() for block in latest_blocks]}
-        return JsonResponse(response)
+        form = GetBlocksForm(request.GET)
+        if form.is_valid():
+            starting_after = form.cleaned_data['starting_after']
+            since = form.cleaned_data['since']
+            until = form.cleaned_data['until']
+            page_size = form.cleaned_data['page_size'] or 50
+
+            block_list = Block.objects.filter(in_longest=1)
+
+            if since is not None:
+                block_list = block_list.filter(time__gte=since)
+
+            if until is not None:
+                block_list = block_list.filter(time__lt=until)
+
+            try:
+                start_block = Block.objects.get(hash=starting_after) if starting_after else None
+            except Tx.DoesNotExist:
+                response = {'error': 'block not exist'}
+                return JsonResponse(response, status=httplib.NOT_FOUND)
+
+            page, blocks = object_pagination(block_list, start_block, page_size)
+
+            if len(blocks) > 0 and blocks.has_next():
+                query_dict = request.GET.copy()
+                query_dict['starting_after'] = blocks[-1].hash
+                page['next_uri'] = '/explorer/v1/blocks?' + query_dict.urlencode()
+
+            response = {
+                'page': page,
+                'blocks': [block.as_dict() for block in blocks]
+            }
+            return JsonResponse(response)
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
 
 
 class GetBlockByHashView(View):
@@ -67,10 +101,12 @@ class GetColorTxsView(View):
                 tx_list = tx_list.filter(time__lt=until)
 
             try:
-                page, txs = tx_pagination(tx_list, starting_after, page_size)
+                start_tx = Tx.objects.get(hash=starting_after) if starting_after else None
             except Tx.DoesNotExist:
                 response = {'error': 'tx not exist'}
                 return JsonResponse(response, status=httplib.NOT_FOUND)
+
+            page, txs = object_pagination(tx_list, start_tx, page_size)
 
             if len(txs) > 0 and txs.has_next():
                 query_dict = request.GET.copy()
@@ -113,10 +149,12 @@ class GetAddressTxsView(View):
                 tx_list = tx_list.filter(time__lt=until)
 
             try:
-                page, txs = tx_pagination(tx_list, starting_after, page_size)
+                start_tx = Tx.objects.get(hash=starting_after) if starting_after else None
             except Tx.DoesNotExist:
                 response = {'error': 'tx not exist'}
                 return JsonResponse(response, status=httplib.NOT_FOUND)
+
+            page, txs = object_pagination(tx_list, start_tx, page_size)
 
             if len(txs) > 0 and txs.has_next():
                 query_dict = request.GET.copy()
