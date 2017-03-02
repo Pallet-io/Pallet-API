@@ -618,11 +618,10 @@ class AddressNotifyDaemonTestCase(TestCase):
                 tx_hash="1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2"
             )
         ])
-        notifications = AddressNotification.objects.filter(is_notified=False)
-
         daemon = AddressNotifyDaemon()
-        daemon.start_notify(notifications)
+        daemon.start_notify()
 
+        notifications = AddressNotification.objects.filter(is_notified=False)
         # test fetch call
         call_list = mock_asynchttpclient_instance.fetch.call_args_list
         requests = []
@@ -668,7 +667,7 @@ class AddressNotifyDaemonTestCase(TestCase):
         mock_ioloop_instance.return_value = mock_ioloop_instance_obj
 
         daemon = AddressNotifyDaemon()
-        daemon.start_notify(AddressNotification.objects.filter(is_notified=False))
+        daemon.start_notify()
 
         self.assertFalse(mock_ioloop_instance_obj.start.called)
         self.assertFalse(mock_ioloop_instance_obj.stop.called)
