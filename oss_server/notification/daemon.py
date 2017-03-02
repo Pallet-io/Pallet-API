@@ -3,7 +3,6 @@ import time
 import urllib
 
 from django.conf import settings
-from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
@@ -51,7 +50,7 @@ class TxNotifyDaemon(GcoinRPCMixin):
 
     def _get_callback_func(self, notification, total):
         def callback(response):
-            self.count = self.count + 1
+            self.count += 1
             logger.debug("-"*20)
             logger.debug("Request url: {}".format(response.request.url))
             logger.debug("Request effective url: {}".format(response.effective_url))
@@ -128,7 +127,7 @@ class TxNotifyDaemon(GcoinRPCMixin):
                         continue
 
                     if hasattr(tx, 'confirmations') and tx.confirmations >= tx_subscription.confirmation_count:
-                       new_notifications.append(TxNotification(subscription=tx_subscription))
+                        new_notifications.append(TxNotification(subscription=tx_subscription))
 
                 TxNotification.objects.bulk_create(new_notifications)
             else:
@@ -149,11 +148,11 @@ class AddressNotifyDaemon(GcoinRPCMixin):
 
     def _get_callback_func(self, notification, total):
         def callback(response):
-            self.count = self.count + 1
+            self.count += 1
             logger.debug("-"*20)
             logger.debug("Request url: {}".format(response.request.url))
             logger.debug("Request effective url: {}".format(response.effective_url))
-            logger.debug("Respons code: {}".format(response.code))
+            logger.debug("Response code: {}".format(response.code))
             logger.debug("Notification id: {}".format(notification.id))
             if response.code == 200:
                 AddressNotification.objects.filter(id=notification.id).update(
@@ -170,14 +169,17 @@ class AddressNotifyDaemon(GcoinRPCMixin):
                 ioloop.IOLoop.instance().stop()
         return callback
 
-    def start_notify(self, notifications):
-        if notifications.count() == 0:
+    def start_notify(self):
+        notifications = list(AddressNotification.objects
+                             .filter(is_notified=False, notification_attempts__lt=RETRY_TIMES)
+                             .prefetch_related('subscription'))
+        if not notifications:
             return
 
         self.count = 0
         client = AsyncHTTPClient()
         headers = {'content-type': "application/x-www-form-urlencoded"}
-        total = notifications.count()
+        total = len(notifications)
 
         for notification in notifications:
             post_data = {
@@ -216,8 +218,7 @@ class AddressNotifyDaemon(GcoinRPCMixin):
             # create AddressNotification instance in database
             self.create_notifications(addr_txs_map)
 
-            notifications = AddressNotification.objects.filter(is_notified=False, notification_attempts__lt=RETRY_TIMES)
-            self.start_notify(notifications)
+            self.start_notify()
 
             self.set_last_seen_block(new_blocks[-1]['hash'])
 
@@ -259,7 +260,7 @@ class AddressNotifyDaemon(GcoinRPCMixin):
                 related_addresses = self.get_related_addresses(tx)
 
                 for address in related_addresses:
-                    if addr_txs_map.has_key(address):
+                    if address in addr_txs_map:
                         addr_txs_map[address].append(tx)
                     else:
                         addr_txs_map[address] = [tx]
@@ -270,7 +271,7 @@ class AddressNotifyDaemon(GcoinRPCMixin):
         subscriptions = AddressSubscription.objects.all()
         new_notifications = []
 
-        # Only the address that is in addr_txs_map and subscription need to be notify,
+        # Only the address that is in addr_txs_map and subscription needs to be notified,
         # so iterate through the small one is more efficient
         if len(addr_txs_map) < subscriptions.count():
             for address, txs in addr_txs_map.iteritems():
@@ -279,21 +280,21 @@ class AddressNotifyDaemon(GcoinRPCMixin):
                         new_notifications.append(AddressNotification(subscription=subscription, tx_hash=tx.txid))
         else:
             for subscription in subscriptions:
-                if addr_txs_map.has_key(subscription.address):
+                if subscription.address in addr_txs_map:
                     for tx in addr_txs_map[subscription.address]:
                         new_notifications.append(AddressNotification(subscription=subscription, tx_hash=tx.txid))
 
         AddressNotification.objects.bulk_create(new_notifications)
 
     def get_related_addresses(self, tx):
-        if tx.type == 'NORMAL' and tx.vin[0].has_key('coinbase'):
+        if tx.type == 'NORMAL' and 'coinbase' in tx.vin[0]:
             # this tx is the first tx of every block, just skip
             return []
 
         addresses = []
         # addresses in vin
         for vin in tx.vin:
-            if not vin.has_key('coinbase'):
+            if 'coinbase' not in vin:
                 prev_vout = self.get_prev_vout(vin['txid'], vin['vout'])
                 addresses.extend(self.get_address_from_vout(prev_vout))
 
