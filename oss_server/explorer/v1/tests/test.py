@@ -21,11 +21,11 @@ def tearDownModule():
 class GetLatestBlocksTest(TestCase):
 
     def test_get_latest_blocks(self):
-        url = '/explorer/v1/blocks'
-        response = self.client.get(url)
+        base_url = '/explorer/v1/blocks'
+        response = self.client.get(base_url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(len(response.json()['blocks']), 50)
-        # get the latest block
+        # get the latest 50 blocks
         block = response.json()['blocks'][0]
         self.assertEqual(block['hash'], '000001618d6fae9349bed836a56422bd161103ff44083bf9ff58358c8d882191')
         self.assertEqual(block['branch'], 'main')
@@ -34,6 +34,37 @@ class GetLatestBlocksTest(TestCase):
             self.assertEqual(next_block['branch'], 'main')
             self.assertLessEqual(int(next_block['time']), int(block['time']))
             block = next_block
+
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '000001618d6fae9349bed836a56422bd161103ff44083bf9ff58358c8d882191')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '000000ef95a7cdb7aaf4c008c0745eb5fc9f39ca66061d16add04ba1a0b9b507')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=000000ef95a7cdb7aaf4c008c0745eb5fc9f39ca66061d16add04ba1a0b9b507')
+
+        # next page
+        url = base_url + '?starting_after=000000ef95a7cdb7aaf4c008c0745eb5fc9f39ca66061d16add04ba1a0b9b507'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['blocks']), 50)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '0000027d45b7ab668bd63ee0c3bdcd3ca967e8942637ab7cdfa24d9b1867a42a')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '000008746e947a8ddb37f940a41fb23dbee6eb599107f46ebafb8a8947e914d2')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=000008746e947a8ddb37f940a41fb23dbee6eb599107f46ebafb8a8947e914d2')
+
+    def test_get_blocks_with_since_until(self):
+        base_url = '/explorer/v1/blocks'
+        response = self.client.get(base_url + '?since=1470326158&until=1470816119')
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertEqual(len(response.json()['blocks']), 50)
+        self.assertEqual(response.json()['page']['starting_after'],
+                         '00000277603449635cd330c8f78c49f8723dd3de4251e2ee5b159f28fb1496c9')
+        self.assertEqual(response.json()['page']['ending_before'],
+                         '0000057d097eaa7fad1a843237fa76689bc2a0956c20e2dab1ea30da0faa8b4d')
+        self.assertEqual(response.json()['page']['next_uri'],
+                         base_url + '?starting_after=0000057d097eaa7fad1a843237fa76689bc2a0956c20e2dab1ea30da0faa8b4d&since=1470326158&until=1470816119')
 
 
 class GetBlockByHashTest(TestCase):
