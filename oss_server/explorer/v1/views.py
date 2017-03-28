@@ -3,6 +3,7 @@ import httplib
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import View
+from django.db.models import Max
 
 from .forms import GetAddressTxsForm, GetBlocksForm, GetColorTxsForm
 from ..models import *
@@ -26,8 +27,19 @@ class GetBlocksView(View):
             if until is not None:
                 block_list = block_list.filter(time__lt=until)
 
+            is_first_page = False
             try:
                 start_block = Block.objects.get(hash=starting_after) if starting_after else None
+                max_height = Block.objects.all().aggregate(Max('height'))['height__max']
+                pre_start_height = self._get_prev_start_height(start_block, page_size)
+
+                if not start_block:
+                    is_first_page = True
+
+                if start_block and start_block.height == max_height:
+                    is_first_page = True
+                    start_block = None
+
             except Tx.DoesNotExist:
                 response = {'error': 'block not exist'}
                 return JsonResponse(response, status=httplib.NOT_FOUND)
@@ -39,6 +51,18 @@ class GetBlocksView(View):
                 query_dict['starting_after'] = blocks[-1].hash
                 page['next_uri'] = '/explorer/v1/blocks?' + query_dict.urlencode()
 
+            if len(blocks) > 0:
+                if is_first_page:
+                    page['prev_uri'] = ''
+                else:
+                    prev_dict = request.GET.copy()
+                    if pre_start_height == max_height:
+                        prev_dict['starting_after'] = Block.objects.get(in_longest=1, height=pre_start_height)
+                        page['prev_uri'] = '/explorer/v1/blocks?' + prev_dict.urlencode()
+                    else:
+                        prev_dict['starting_after'] = Block.objects.get(in_longest=1, height=pre_start_height + 1)
+                        page['prev_uri'] = '/explorer/v1/blocks?' + prev_dict.urlencode()
+
             response = {
                 'page': page,
                 'blocks': [block.as_dict() for block in blocks]
@@ -48,6 +72,13 @@ class GetBlocksView(View):
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+    def _get_prev_start_height(self, start_block, page_size):
+        if start_block:
+            pre_start_height = start_block.height + 1 * page_size - 1
+            return pre_start_height
+        else:
+            return None
 
 
 class GetBlockByHashView(View):
