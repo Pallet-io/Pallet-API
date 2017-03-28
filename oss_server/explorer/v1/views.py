@@ -1,9 +1,8 @@
 import httplib
 
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.views.generic import View
-from django.db.models import Max
 
 from .forms import GetAddressTxsForm, GetBlocksForm, GetColorTxsForm
 from ..models import *
