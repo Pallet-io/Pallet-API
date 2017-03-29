@@ -1,0 +1,99 @@
+stages:
+  - test
+  - build_image
+  - system_test
+  - upload
+  - upload_tag
+  - clean
+
+.gitlab_template: &gitlab_registry
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  after_script:
+    - docker logout $CI_REGISTRY
+
+test:install:
+  stage: test
+  image: centos:7
+  script:
+    - echo "unit_test:install"
+  tags:
+    - docker
+
+test:unit_test:
+  stage: test
+  image: centos:7
+  script:
+    - echo "unit test"
+  tags:
+    - docker
+
+test:functional_test:
+  stage: test
+  image: centos:7
+  script:
+    - echo "functional/integration test"
+  tags:
+    - docker
+
+build_image:
+  stage: build_image
+  script:
+    - git clone git@gitlab.com:Cepave/DockerCompose-Gcoin.git
+    - bash ./DockerCompose-Gcoin/build.sh -p oss
+  tags:
+    - shell
+  only:
+    - master
+    - tags
+    - /^develop/
+
+system_test:
+  stage: system_test
+  script:
+    - echo "system test with image"
+  tags:
+    - shell
+  only:
+    - master
+    - tags
+    - /^develop/
+
+upload_image:
+  <<: *gitlab_registry
+  stage: upload
+  script:
+    - docker tag vchain-oss $CI_REGISTRY_IMAGE:${CI_BUILD_REF:0:8}
+    - docker push $CI_REGISTRY_IMAGE:${CI_BUILD_REF:0:8}
+    - docker rmi $CI_REGISTRY_IMAGE:${CI_BUILD_REF:0:8}
+  tags:
+    - shell
+  only:
+    - master
+    - /^develop/
+
+upload_tag_image:
+  <<: *gitlab_registry
+  stage: upload_tag
+  script:
+    - docker tag vchain-oss $CI_REGISTRY_IMAGE
+    - docker push $CI_REGISTRY_IMAGE
+    - docker rmi $CI_REGISTRY_IMAGE
+    - docker tag vchain-oss $CI_REGISTRY_IMAGE:$CI_BUILD_TAG
+    - docker push $CI_REGISTRY_IMAGE:$CI_BUILD_TAG
+    - docker rmi $CI_REGISTRY_IMAGE:$CI_BUILD_TAG
+  tags:
+    - shell
+  only:
+    - tags
+
+clean_image:
+  stage: clean
+  script:
+    - docker rmi vchain-oss ; exit 0
+  tags:
+    - shell
+  only:
+    - master
+    - tags
+    - /^develop/
