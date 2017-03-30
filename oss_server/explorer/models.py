@@ -102,10 +102,11 @@ class Tx(models.Model):
     TX_TYPE = {
         0: 'NORMAL',
         1: 'MINT',
-        2: 'LICENSE',
-        3: 'VOTE',
-        4: 'BANVOTE',
-        5: 'CONTRACT'
+        5: 'CONTRACT',
+        32: 'VOTE',
+        48: 'LICENSE',
+        64: 'MINER',
+        65: 'DEMINER'
     }
 
     hash = models.CharField(max_length=64)
