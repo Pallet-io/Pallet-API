@@ -65,7 +65,7 @@ class CreateLicenseRawTxView(View):
     def __init__(self):
         super(CreateLicenseRawTxView, self).__init__()
         self._conn = get_rpc_connection()
-        self.TX_LICENSE_TYPE = 2
+        self.TX_LICENSE_TYPE = 0x30
 
     def get(self, request):
         form = CreateLicenseRawTxForm(request.GET)
