@@ -96,19 +96,9 @@ class BlockDBUpdater(object):
             current_block = next_block
 
     def _update_txout_spent(self):
-        txouts_to_update = TxOut.objects.filter(tx__block__hash__in=self.blocks_hash_cache)
-        txouts_to_update.filter(tx__block__in_longest=0).update(spent=None)
-
-        main_chain_txouts = txouts_to_update.filter(tx__block__in_longest=1)
-
-        # reset every `spent` of `txout` to 0 first
-        main_chain_txouts.update(spent=0)
-
-        # update whichever `txout` has a `tx_in` in mainchain
-        main_chain_txouts.filter(
-            tx_in__isnull=False,
-            tx_in__tx__block__in_longest=1
-        ).update(spent=1)
+        txout_with_txin = TxOut.objects.filter(tx_in__tx__block__hash__in=self.blocks_hash_cache)
+        txout_with_txin.filter(tx_in__tx__block__in_longest=0).update(spent=0)
+        txout_with_txin.filter(tx_in__tx__block__in_longest=1).update(spent=1)
 
     def _parse_raw_block_to_db(self, file_path, file_offset):
         with open(file_path, 'rb') as blockchain:

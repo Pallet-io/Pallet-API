@@ -701,7 +701,7 @@ class GetAddressBalanceTest(TestCase):
         url = '/explorer/v1/addresses/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY/balances'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
-        self.assertEqual(int(response.json().get('1')), 2700300000000)
+        self.assertEqual(int(response.json().get('1')), 1910600000000)
         self.assertEqual(int(response.json().get('2')), 482000000000)
 
     def test_address_no_balance(self):

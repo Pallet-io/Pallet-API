@@ -139,7 +139,7 @@ class TxOut(models.Model):
     position = models.DecimalField(max_digits=10, decimal_places=0)
     scriptpubkey = models.BinaryField(blank=True, null=True)
     address = models.ForeignKey(Address, related_name='tx_outs', related_query_name='tx_out')
-    spent = models.DecimalField(max_digits=1, decimal_places=0, blank=True, null=True)
+    spent = models.DecimalField(max_digits=1, decimal_places=0, default=0)
     color = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
     @property
