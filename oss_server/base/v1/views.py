@@ -14,6 +14,7 @@ from gcoin import (encode_license, make_mint_raw_tx, make_raw_tx,
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
+from oss_server.types import TransactionType
 from oss_server.utils import address_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
@@ -65,7 +66,6 @@ class CreateLicenseRawTxView(View):
     def __init__(self):
         super(CreateLicenseRawTxView, self).__init__()
         self._conn = get_rpc_connection()
-        self.TX_LICENSE_TYPE = 2
 
     def get(self, request):
         form = CreateLicenseRawTxForm(request.GET)
@@ -92,7 +92,7 @@ class CreateLicenseRawTxView(View):
             create_license_raw_tx = make_raw_tx(
                 color_0_tx_ins,
                 license_info_tx_outs,
-                self.TX_LICENSE_TYPE
+                TransactionType.toNumber('LICENSE')
             )
 
             return JsonResponse({'raw_tx': create_license_raw_tx})
@@ -132,7 +132,6 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
     FEE_COLOR = 1
     TX_FEE = 1
     DEFAULT_CONTRACT_FEE = 1
-    TX_CONTRACT_TYPE = 5
 
     def post(self, request, *args, **kwargs):
         form = CreateSmartContractRawTxForm(request.POST)
@@ -176,7 +175,7 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
                     })
             outs += self._build_txouts(from_address, to_address, code, contract_fee, fee_inputs)
 
-            raw_tx = make_raw_tx(ins, outs, self.TX_CONTRACT_TYPE)
+            raw_tx = make_raw_tx(ins, outs, TransactionType.toNumber('CONTRACT'))
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
@@ -345,7 +344,7 @@ class CreateLicenseTransferRawTxView(View):
             ins = [utxo_to_txin(utxo)]
             outs = [{'address': to_address, 'value': 100000000, 'color': color_id}]
 
-            raw_tx = make_raw_tx(ins, outs, 2)
+            raw_tx = make_raw_tx(ins, outs, TransactionType.toNumber('LICENSE'))
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))

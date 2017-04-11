@@ -7,6 +7,8 @@ from django.db import models
 
 from gcoin import decode_op_return_script
 
+from oss_server.types import TransactionType
+
 
 class Address(models.Model):
     address = models.CharField(unique=True, max_length=40)
@@ -99,15 +101,6 @@ class Datadir(models.Model):
 
 
 class Tx(models.Model):
-    TX_TYPE = {
-        0: 'NORMAL',
-        1: 'MINT',
-        2: 'LICENSE',
-        3: 'VOTE',
-        4: 'BANVOTE',
-        5: 'CONTRACT'
-    }
-
     hash = models.CharField(max_length=64)
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
@@ -122,7 +115,7 @@ class Tx(models.Model):
             ('block_hash', self.block.hash),
             ('version', self.version),
             ('locktime', self.locktime),
-            ('type', self.TX_TYPE[int(self.type)]),
+            ('type', TransactionType.toType(int(self.type))),
             ('time', self.time),
             ('confirmation', self.block.confirmation),
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
