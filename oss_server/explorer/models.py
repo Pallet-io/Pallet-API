@@ -4,6 +4,7 @@ import binascii
 from collections import OrderedDict
 
 from django.db import models
+from oss_server.types import TransactionType
 
 from gcoin import decode_op_return_script
 
@@ -99,16 +100,6 @@ class Datadir(models.Model):
 
 
 class Tx(models.Model):
-    TX_TYPE = {
-        0: 'NORMAL',
-        1: 'MINT',
-        5: 'CONTRACT',
-        32: 'VOTE',
-        48: 'LICENSE',
-        64: 'MINER',
-        65: 'DEMINER'
-    }
-
     hash = models.CharField(max_length=64)
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
@@ -123,7 +114,7 @@ class Tx(models.Model):
             ('block_hash', self.block.hash),
             ('version', self.version),
             ('locktime', self.locktime),
-            ('type', self.TX_TYPE[int(self.type)]),
+            ('type', TransactionType.toType(int(self.type))),
             ('time', self.time),
             ('confirmation', self.block.confirmation),
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
