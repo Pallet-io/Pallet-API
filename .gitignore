@@ -63,3 +63,6 @@ target/
 
 # Database
 *.sqlite3
+
+# IDE
+.idea/
