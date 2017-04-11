@@ -13,6 +13,7 @@ from gcoin import (encode_license, make_mint_raw_tx, make_raw_tx,
                    mk_op_return_script)
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
+
 from oss_server.types import TransactionType
 from oss_server.utils import address_validator
 

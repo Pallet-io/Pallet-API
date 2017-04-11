@@ -11,9 +11,9 @@ class TransactionType:
 
     @staticmethod
     def toType(tx_type_number):
-        for type in TransactionType.TX_TYPE:
-            if TransactionType.TX_TYPE[type] == tx_type_number:
-                return type
+        for k, v in TransactionType.TX_TYPE.iteritems():
+            if v == tx_type_number:
+                return k
 
     @staticmethod
     def toNumber(tx_string):
