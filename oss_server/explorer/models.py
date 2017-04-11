@@ -4,9 +4,10 @@ import binascii
 from collections import OrderedDict
 
 from django.db import models
-from oss_server.types import TransactionType
 
 from gcoin import decode_op_return_script
+
+from oss_server.types import TransactionType
 
 
 class Address(models.Model):
