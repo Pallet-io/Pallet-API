@@ -1,27 +1,39 @@
 import binascii
 import hashlib
 import struct
+import re
 
 import base58
+from gcoin import ripemd
+
+pubkey_hash_re = re.compile(r'^76a914[a-f0-9]{40}88ac$')
+pubkey_re = re.compile(r'^21[a-f0-9]{66}ac$')
+script_hash_re = re.compile(r'^a914[a-f0-9]{40}87$')
+
 
 def uint1(stream):
     return ord(stream.read(1))
 
+
 def uint2(stream):
     return struct.unpack('H', stream.read(2))[0]
+
 
 def uint4(stream):
     return struct.unpack('I', stream.read(4))[0]
 
+
 def uint8(stream):
     return struct.unpack('Q', stream.read(8))[0]
+
 
 def hash32(stream):
     return stream.read(32)[::-1]
 
+
 def time(stream):
-    time = uint4(stream)
-    return time
+    return uint4(stream)
+
 
 def varint(stream):
     size = uint1(stream)
@@ -37,21 +49,38 @@ def varint(stream):
 
     return -1
 
+
 def hashStr(bytebuffer):
     return ''.join(('%02x'%ord(a)) for a in bytebuffer)
+
 
 def hashStrLE(bytebuffer):
     return ''.join([('%02x'%ord(a)) for a in bytebuffer][::-1])
 
+
 def intLE(num):
     return struct.pack("<i", (num) % 2**32).encode('hex')
 
-def publicKeyDecode(pub):
-    pub = pub[2: -2]
-    hash1 = hashlib.sha256(binascii.unhexlify(pub))
-    hash2 = hashlib.new('ripemd160', hash1.digest())
-    padded = (b'\x00') + hash2.digest()
-    hash3 = hashlib.sha256(padded)
-    hash4 = hashlib.sha256(hash3.digest())
-    padded += hash4.digest()[:4]
+
+def addressFromScriptPubKey(script_pub_key):
+    script_pub_key = script_pub_key.lower()
+    version_prefix = b'\x00'
+    # pay to pubkey hash
+    if pubkey_hash_re.match(script_pub_key):
+        pubkey_hash = binascii.unhexlify(script_pub_key[6:-4])
+    # pay to pubkey
+    elif pubkey_re.match(script_pub_key):
+        hash1 = hashlib.sha256(binascii.unhexlify(script_pub_key[2:-2]))
+        pubkey_hash = ripemd.RIPEMD160(hash1.digest()).digest()
+    # pay to script hash
+    elif script_hash_re.match(script_pub_key):
+        pubkey_hash = binascii.unhexlify(script_pub_key[4:-2])
+        version_prefix = b'\x05'
+    else:
+        return ''
+
+    padded = version_prefix + pubkey_hash
+    hash2 = hashlib.sha256(padded)
+    hash3 = hashlib.sha256(hash2.digest())
+    padded += hash3.digest()[:4]
     return base58.b58encode(padded)

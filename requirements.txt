@@ -1,5 +1,7 @@
 django==1.9.6
+django-infinite-scroll-pagination==0.1.3
+gcoin
+gcoin-rpc
 mock==1.0.1
-
-git+ssh://github.com/OpenNetworking/gcoin-rpc.git@develop#egg=gcoin-python
-git+ssh://github.com/OpenNetworking/pygcointools@master
+MySQL-python==1.2.5
+tornado==4.4.1

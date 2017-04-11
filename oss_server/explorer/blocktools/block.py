@@ -4,6 +4,9 @@ from blocktools import *
 from gcoin.transaction import serialize
 
 
+GC30 = 2509744043
+SKIP_LIMIT = 100
+
 class BlockHeader:
 
     def __init__(self, blockchain):
@@ -45,11 +48,12 @@ class BlockHeader:
         print "Version:\t %d" % self.version
         print "Previous Hash\t %s" % hashStr(self.previousHash)
         print "Merkle Root\t %s" % hashStr(self.merkleHash)
-        print "Time\t\t %s" % str(self.time)
+        print "Time\t\t %d" % self.time
         print "Bits\t\t %8x" % self.bits
         print "Difficulty\t %.8f" % self.difficulty
         print "Nonce\t\t %s" % self.nonce
         print "Hash\t\t %s" % self.blockHash
+        print "Work\t\t %x" % self.blockWork
 
 
 class Block:
@@ -58,23 +62,34 @@ class Block:
         self.continueParsing = True
         self.magicNum = 0
         self.blocksize = 0
-        self.blockheader = ''
+        self.blockHeader = ''
         self.txCount = 0
         self.Txs = []
         self.scriptSig = ''
 
-        if self.hasLength(blockchain, 8):
+        # Skip bytes with all 0 between blocks
+        # Note: I assume bytes with all 0 between blocks will no more than SKIP_LIMIT
+        skip_bytes = 0
+        while self.hasLength(blockchain, 8) and skip_bytes < SKIP_LIMIT:
             self.magicNum = uint4(blockchain)
-            self.blocksize = uint4(blockchain)
-        else:
+
+            if self.magicNum == GC30:
+                # this is normal situation
+                self.blocksize = uint4(blockchain)
+                break
+            elif self.magicNum == 0:
+                # skip 4 bytes
+                skip_bytes += 4
+            else:
+                # assume blk file is broken when magic number is not GC30 and 0
+                self.continueParsing = False
+                return
+
+        if skip_bytes >= SKIP_LIMIT:
             self.continueParsing = False
             return
 
-        if self.blocksize <= 0:
-            self.continueParsing = False
-            return
-
-        if self.hasLength(blockchain, self.blocksize):
+        if self.blocksize > 0 and self.hasLength(blockchain, self.blocksize):
             self.setHeader(blockchain)
             self.txCount = varint(blockchain)
             self.Txs = []
@@ -102,7 +117,7 @@ class Block:
         blockchain.seek(curPos)
 
         tempBlockSize = fileSize - curPos
-        print tempBlockSize
+
         if tempBlockSize < size:
             return False
         return True
@@ -127,6 +142,7 @@ class Block:
 class Tx:
 
     def __init__(self, blockchain):
+        txStart = blockchain.tell()
         self.version = uint4(blockchain)
         self.inCount = varint(blockchain)
         self.inputs = []
@@ -141,6 +157,7 @@ class Tx:
                 self.outputs.append(output)
         self.lockTime = uint4(blockchain)
         self.txType = uint4(blockchain)
+        self.size = blockchain.tell() - txStart
 
     @property
     def txHex(self):
@@ -167,6 +184,7 @@ class Tx:
             o.toString()
         print "Lock Time:\t %d" % self.lockTime
         print "TX TYPE:\t %d" % self.txType
+        print "TX Size:\t %d" % self.size
 
     def toDict(self):
         txDict = {
@@ -222,7 +240,7 @@ class txOutput:
 
     @property
     def address(self):
-        return publicKeyDecode(hashStr(self.pubkey))
+        return addressFromScriptPubKey(hashStr(self.pubkey))
 
     def toString(self):
         print "--------------TX OUT------------------------"

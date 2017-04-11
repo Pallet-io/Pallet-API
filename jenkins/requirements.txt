@@ -1,6 +1,5 @@
 coverage
+django-jenkins
 flake8
 pep8
 pylint
-
--e git+git://github.com/kmmbvnr/django-jenkins.git#egg=django-jenkins

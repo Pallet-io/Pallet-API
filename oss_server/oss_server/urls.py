@@ -23,4 +23,5 @@ urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^base/', include('base.urls', namespace='base')),
     url(r'^explorer/', include('explorer.urls', namespace='explorer')),
+    url(r'^notification/', include('notification.urls', namespace='notification')),
 ]

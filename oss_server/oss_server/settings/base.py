@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/1.9/ref/settings/
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # Quick-start development settings - unsuitable for production
@@ -85,8 +85,16 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    },
+    'explorer_db': {
+        'NAME': 'explorer_db',
+        'ENGINE': 'django.db.backends.mysql',
+        'USER': '',
+        'PASSWORD': ''
     }
 }
+
+DATABASE_ROUTERS = ['explorer.router.ExplorerRouter']
 
 
 # Password validation
@@ -126,3 +134,51 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# Logger
+
+LOG_DIR = os.path.join(os.path.dirname(BASE_DIR), 'log')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format' : "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            'datefmt' : "%Y-%m-%d %H:%M:%S"
+        },
+    },
+    'handlers': {
+        'debug_log_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'debug.log'),
+            'formatter': 'verbose'
+        },
+        'error_log_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'django.log'),
+            'formatter': 'verbose'
+        },
+        'explorer_log_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'explorer.log'),
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'base': {
+            'handlers': ['debug_log_file', 'error_log_file'],
+            'level': 'DEBUG'
+        },
+        'notification': {
+            'handlers': ['debug_log_file', 'error_log_file'],
+            'level': 'DEBUG'
+        },
+        'explorer': {
+            'handlers': ['explorer_log_file'],
+            'level': 'INFO'
+        },
+    }
+}
