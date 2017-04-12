@@ -115,7 +115,7 @@ class Tx(models.Model):
             ('block_hash', self.block.hash),
             ('version', self.version),
             ('locktime', self.locktime),
-            ('type', TransactionType.toType(int(self.type))),
+            ('type', TransactionType.to_type(int(self.type))),
             ('time', self.time),
             ('confirmation', self.block.confirmation),
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
