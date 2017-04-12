@@ -92,7 +92,7 @@ class CreateLicenseRawTxView(View):
             create_license_raw_tx = make_raw_tx(
                 color_0_tx_ins,
                 license_info_tx_outs,
-                TransactionType.toNumber('LICENSE')
+                TransactionType.to_number('LICENSE')
             )
 
             return JsonResponse({'raw_tx': create_license_raw_tx})
@@ -175,7 +175,7 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
                     })
             outs += self._build_txouts(from_address, to_address, code, contract_fee, fee_inputs)
 
-            raw_tx = make_raw_tx(ins, outs, TransactionType.toNumber('CONTRACT'))
+            raw_tx = make_raw_tx(ins, outs, TransactionType.to_number('CONTRACT'))
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
@@ -344,7 +344,7 @@ class CreateLicenseTransferRawTxView(View):
             ins = [utxo_to_txin(utxo)]
             outs = [{'address': to_address, 'value': 100000000, 'color': color_id}]
 
-            raw_tx = make_raw_tx(ins, outs, TransactionType.toNumber('LICENSE'))
+            raw_tx = make_raw_tx(ins, outs, TransactionType.to_number('LICENSE'))
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
