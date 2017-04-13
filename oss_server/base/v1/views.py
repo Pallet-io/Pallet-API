@@ -229,12 +229,14 @@ class GetRawTxView(View):
         del base_tx['vout']
 
         for index, vin in enumerate(base_tx['vins']):
-            base_tx['vins'][index]['tx_hash'] = base_tx['vins'][index]['txid']
-            del base_tx['vins'][index]['txid']
+            if hasattr(base_tx['vins'][index], 'txid'):
+                base_tx['vins'][index]['tx_hash'] = base_tx['vins'][index]['txid']
+                del base_tx['vins'][index]['txid']
 
         for index, vout in enumerate(base_tx['vouts']):
-            base_tx['vouts'][index]['amount'] = base_tx['vouts'][index]['value']
-            del base_tx['vouts'][index]['value']
+            if hasattr(base_tx['vouts'][index], 'value'):
+                base_tx['vouts'][index]['amount'] = base_tx['vouts'][index]['value']
+                del base_tx['vouts'][index]['value']
 
         return base_tx
 
