@@ -1,6 +1,5 @@
 import logging
 import os
-import traceback
 from time import sleep
 
 from django.core.exceptions import MultipleObjectsReturned
@@ -8,13 +7,13 @@ from django.db import transaction
 
 from blocktools.block import Block
 from blocktools.blocktools import *
+from django.conf import settings
 
-from .configs import BLK_DIR
-from .models import Block as BlockDb
 from .models import Address, Datadir, Tx, TxIn, TxOut
+from .models import Block as BlockDb
 
 logger = logging.getLogger(__name__)
-
+BLK_DIR = settings.BLK_DIR
 
 class BlockDbException(Exception):
     """Exception for block db contents."""
