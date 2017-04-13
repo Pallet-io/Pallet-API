@@ -1,3 +1,6 @@
+# Environment setting
+oss_server/oss_server/settings/setting.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
