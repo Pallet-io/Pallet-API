@@ -212,10 +212,31 @@ class GetRawTxView(View):
     def get(self, request, tx_id, *args, **kwargs):
         try:
             response = get_rpc_connection().getrawtransaction(tx_id)
-            return JsonResponse(response.__dict__)
+            tx = self._to_explorer_style(response.__dict__)
+            return JsonResponse(tx)
         except (InvalidParameter, InvalidAddressOrKey):
             response = {'error': 'transaction not found'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
+
+    def _to_explorer_style(self, base_tx):
+        base_tx['hash'] = base_tx['txid']
+        del base_tx['txid']
+
+        base_tx['vins'] = base_tx['vin']
+        del base_tx['vin']
+
+        base_tx['vouts'] = base_tx['vout']
+        del base_tx['vout']
+
+        for index, vin in enumerate(base_tx['vins']):
+            base_tx['vins'][index]['tx_hash'] = base_tx['vins'][index]['txid']
+            del base_tx['vins'][index]['txid']
+
+        for index, vout in enumerate(base_tx['vouts']):
+            base_tx['vouts'][index]['amount'] = base_tx['vouts'][index]['value']
+            del base_tx['vouts'][index]['value']
+
+        return base_tx
 
 
 class CreateRawTxView(View):

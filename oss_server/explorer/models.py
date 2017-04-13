@@ -112,12 +112,12 @@ class Tx(models.Model):
     def as_dict(self):
         return OrderedDict([
             ('hash', self.hash),
-            ('block_hash', self.block.hash),
-            ('version', self.version),
-            ('locktime', self.locktime),
+            ('blockhash', self.block.hash),
+            ('version', int(self.version)),
+            ('locktime', int(self.locktime)),
             ('type', TransactionType.to_type(int(self.type))),
-            ('time', self.time),
-            ('confirmation', self.block.confirmation),
+            ('time', int(self.time)),
+            ('confirmations', self.block.confirmation),
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
             ('vouts', [vout.as_dict() for vout in self.tx_outs.all()]),
         ])
@@ -142,25 +142,25 @@ class TxOut(models.Model):
 
     def as_dict(self):
         return OrderedDict([
-            ('n', self.position),
+            ('n', int(self.position)),
             ('address', self.address.address),
             ('scriptPubKey', binascii.hexlify(self.scriptpubkey)),
-            ('color', self.color),
-            ('amount', self.value),
+            ('color', int(self.color)),
+            ('amount', int(self.value)),
         ])
 
     def utxo_dict(self):
         return OrderedDict([
-            ('tx', self.tx.hash),
-            ('n', self.position),
-            ('color', self.color),
-            ('value', self.value)
+            ('tx_hash', self.tx.hash),
+            ('n', int(self.position)),
+            ('color', int(self.color)),
+            ('amount', int(self.value))
         ])
 
     def op_return_dict(self):
         return OrderedDict([
-            ('tx', self.tx.hash),
-            ('n', self.position),
+            ('tx_hash', self.tx.hash),
+            ('n', int(self.position)),
             ('op_return_data', decode_op_return_script(binascii.hexlify(self.scriptpubkey))),
         ])
 
@@ -173,11 +173,11 @@ class TxIn(models.Model):
 
     def as_dict(self):
         return OrderedDict([
-            ('tx_id', self.txout.tx.hash if self.txout else None),
-            ('vout', self.txout.position if self.txout else 0),
+            ('tx_hash', self.txout.tx.hash if self.txout else None),
+            ('vout', int(self.txout.position) if self.txout else 0),
             ('address', self.txout.address.address if self.txout else None),
             ('color', int(self.txout.color) if self.txout else None),
-            ('amount', self.txout.value if self.txout else None),
+            ('amount', int(self.txout.value) if self.txout else None),
             ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
         ])
