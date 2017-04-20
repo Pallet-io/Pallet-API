@@ -9,6 +9,8 @@ SECRET_KEY = '<SECRET_KEY>'
 
 SERVER_CONFIG_ENV = 'oss_server.settings.' + '<ENV>'
 
+ALLOWED_HOSTS = ['<ALLOW_DOMAIN>']
+
 # Gcoin RPC
 
 GCOIN_RPC = {
