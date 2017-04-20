@@ -5,6 +5,10 @@ import os
 
 SECRET_KEY = '<SECRET_KEY>'
 
+# What environment?
+
+SERVER_CONFIG_ENV = 'oss_server.settings.' + '<ENV>'
+
 # Gcoin RPC
 
 GCOIN_RPC = {
