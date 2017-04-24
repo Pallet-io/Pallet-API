@@ -4,7 +4,8 @@ from django.test import TestCase
 
 import mock
 from gcoinrpc.data import TransactionInfo
-from tornado.httpclient import HTTPResponse
+import requests
+import requests_mock
 
 from notification.daemon import TxNotifyDaemon
 from notification.models import TxNotification, TxSubscription
@@ -182,17 +183,10 @@ class TxNotifyDaemonTestCase(TestCase):
         mock_get_transaction.assert_called_with("3da27893cd84d307fccad65d5c0a75fca29efbb4070b1899f2d48725254bbb5e")
         self.assertEqual(notifications.count(), 0)
 
-    @mock.patch('notification.daemon.ioloop.IOLoop.instance')
-    @mock.patch('notification.daemon.AsyncHTTPClient')
-    def test_start_notify(self, mock_asynchttpclient, mock_ioloop_instance):
+    @requests_mock.mock()
+    def test_start_notify(self, m):
 
-        # mock client.fetch
-        mock_asynchttpclient_instance = mock.MagicMock(fetch=mock.MagicMock())
-        mock_asynchttpclient.return_value = mock_asynchttpclient_instance
-
-        # mock ioloop.IOLoop.instance().start() and ioloop.IOLoop.instance().stop()
-        mock_ioloop_instance_obj = mock.MagicMock(start=mock.MagicMock(), stop=mock.MagicMock())
-        mock_ioloop_instance.return_value = mock_ioloop_instance_obj
+        m.post('http://callback1.com', text='data')
 
         # prepare notification to notify
         s1 = TxSubscription.objects.create(
@@ -214,53 +208,33 @@ class TxNotifyDaemonTestCase(TestCase):
         daemon = TxNotifyDaemon()
         daemon.start_notify(notifications)
 
-        # test fetch call
-        call_list = mock_asynchttpclient_instance.fetch.call_args_list
-        requests = []
-        callback_funcs = []
-        for index, notification in enumerate(notifications):
-            request = call_list[index][0][0]
-            requests.append(request)
-            callback_funcs.append(call_list[index][0][1])
-            self.assertEqual(request.url, notification.subscription.callback_url)
+        updated_n1 = TxNotification.objects.get(subscription_id=s1.id)
+        updated_n2 = TxNotification.objects.get(subscription_id=s2.id)
 
-        # mock responses and manually call all callback_funcs
-        responses = [
-            HTTPResponse(request=requests[0], code=200),
-            HTTPResponse(request=requests[1], code=404)
-        ]
-        for index, callback in enumerate(callback_funcs):
-            callback(responses[index])
+        # test notification instance is updated in callback func
+        self.assertTrue(updated_n1.is_notified)
+        self.assertEqual(updated_n1.notification_attempts, 1)
+
+        self.assertFalse(updated_n2.is_notified)
+        self.assertEqual(updated_n2.notification_attempts, 1)
+
+    def test_start_notify_no_notification(self):
+
+        s2 = TxSubscription.objects.create(
+            tx_hash='ce1fe377472da26d2561e36fbdc8d8a67e2e59e2d55da99dab77d5903aeedf2c',
+            callback_url='http://callback2.com',
+            confirmation_count=10
+        )
+        TxNotification.objects.bulk_create([
+            TxNotification(subscription=s2)
+        ])
+        notifications = TxNotification.objects.filter(is_notified=False)
+
+        daemon = TxNotifyDaemon()
 
         for notification in notifications:
             notification.refresh_from_db()
 
-        # test notification instance is updated in callback func
-        self.assertTrue(notifications[0].is_notified)
-        self.assertEqual(notifications[0].notification_attempts, 1)
-
-        self.assertFalse(notifications[1].is_notified)
-        self.assertEqual(notifications[1].notification_attempts, 1)
-
-        # start and stop is called once and only once
-        self.assertEqual(mock_ioloop_instance_obj.stop.call_count, 1)
-        self.assertTrue(mock_ioloop_instance_obj.start.call_count, 1)
-
-    @mock.patch('notification.daemon.ioloop.IOLoop.instance')
-    @mock.patch('notification.daemon.AsyncHTTPClient')
-    def test_start_notify_no_notification(self, mock_asynchttpclient, mock_ioloop_instance):
-
-        # mock client.fetch
-        mock_asynchttpclient_instance = mock.MagicMock(fetch=mock.MagicMock())
-        mock_asynchttpclient.return_value = mock_asynchttpclient_instance
-
-        # mock ioloop.IOLoop.instance().start() and ioloop.IOLoop.instance().stop()
-        mock_ioloop_instance_obj = mock.MagicMock(start=mock.MagicMock(), stop=mock.MagicMock())
-        mock_ioloop_instance.return_value = mock_ioloop_instance_obj
-
-        daemon = TxNotifyDaemon()
-        daemon.start_notify(TxNotification.objects.filter(is_notified=False))
-
-        self.assertFalse(mock_ioloop_instance_obj.start.called)
-        self.assertFalse(mock_ioloop_instance_obj.stop.called)
+        self.assertFalse(notifications[0].is_notified)
+        self.assertEqual(notifications[0].notification_attempts, 0)
 

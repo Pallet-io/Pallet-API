@@ -1,6 +1,5 @@
 import logging
 import time
-import urllib
 
 from django.conf import settings
 from django.db.models import F
@@ -8,8 +7,7 @@ from django.utils import timezone
 
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey
-from tornado import ioloop
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+import requests
 
 from notification.models import AddressSubscription, TxSubscription
 from notification.models import AddressNotification, TxNotification
@@ -25,7 +23,6 @@ def get_rpc_connection():
                              settings.GCOIN_RPC['password'],
                              settings.GCOIN_RPC['host'],
                              settings.GCOIN_RPC['port'])
-
 
 class GcoinRPCMixin(object):
 
@@ -48,36 +45,37 @@ class TxNotifyDaemon(GcoinRPCMixin):
         super(TxNotifyDaemon, self).__init__()
         self.last_seen_block = None
 
-    def _get_callback_func(self, notification, total):
-        def callback(response):
-            self.count += 1
-            logger.debug("-"*20)
-            logger.debug("Request url: {}".format(response.request.url))
-            logger.debug("Request effective url: {}".format(response.effective_url))
-            logger.debug("Response code: {}".format(response.code))
-            logger.debug("Notification id: {}".format(notification.id))
-            if response.code == 200:
+    def call_request(self, post_data, notification):
+        headers = {'content-type': "application/x-www-form-urlencoded"}
+
+        try:
+            response = requests.post(notification.subscription.callback_url,
+                              headers=headers,
+                              data=post_data
+                              )
+            if response.status_code == 200:
                 TxNotification.objects.filter(id=notification.id).update(
-                     is_notified=True,
-                     notification_attempts=F('notification_attempts') + 1,
-                     notification_time=timezone.now()
+                    is_notified=True,
+                    notification_attempts=F('notification_attempts') + 1,
+                    notification_time=timezone.now()
                 )
             else:
                 TxNotification.objects.filter(id=notification.id).update(
-                     notification_attempts=F('notification_attempts') + 1,
+                    notification_attempts=F('notification_attempts') + 1,
                 )
-
-            if self.count == total:
-                ioloop.IOLoop.instance().stop()
-        return callback
+        except Exception as e:
+            logger.error("Request url: {}".format(notification.subscription.callback_url))
+            logger.error("Notification id: {}".format(notification.id))
+            try:
+                TxNotification.objects.filter(id=notification.id).update(
+                    notification_attempts=F('notification_attempts') + 1,
+                )
+            except Exception as e:
+                logger.error(e)
 
     def start_notify(self, notifications):
         if notifications.count() == 0:
             return
-        self.count = 0
-        client = AsyncHTTPClient()
-        headers = {'content-type': "application/x-www-form-urlencoded"}
-        total = notifications.count()
 
         for notification in notifications:
             post_data = {
@@ -85,37 +83,14 @@ class TxNotifyDaemon(GcoinRPCMixin):
                 'subscription_id': notification.subscription.id,
                 'tx_hash': notification.subscription.tx_hash,
             }
-            request = HTTPRequest(
-                          url=notification.subscription.callback_url,
-                          headers=headers,
-                          method='POST',
-                          body=urllib.urlencode(post_data),
-                          connect_timeout=180,
-                          request_timeout=180
-                      )
-
-            client.fetch(request, self._get_callback_func(notification, total))
-
-        logger.debug("start notify")
-        logger.debug("total: {}".format(len(notifications)))
-
-        # block until callback calls ioloop.IOLoop.instance().stop()
-        ioloop.IOLoop.instance().start()
+            self.call_request(post_data, notification)
 
     def run_forever(self, test=False):
 
         while True:
-            logger.debug("-"*20)
-            logger.debug("Start a new round")
             best_block = self.get_best_block()
-            logger.debug("best block: {}".format(best_block['hash']))
-            if self.last_seen_block:
-                logger.debug("last seen block: {}".format(self.last_seen_block['hash']))
-            else:
-                logger.debug("last seen block: None")
 
             if self.last_seen_block is None or self.last_seen_block['hash'] != best_block['hash']:
-                logger.debug("there is new block since last update")
 
                 new_notifications = []
                 for tx_subscription in TxSubscription.objects.filter(txnotification=None):
@@ -130,11 +105,8 @@ class TxNotifyDaemon(GcoinRPCMixin):
                         new_notifications.append(TxNotification(subscription=tx_subscription))
 
                 TxNotification.objects.bulk_create(new_notifications)
-            else:
-                logger.debug("no new block since last update")
 
             notifications = TxNotification.objects.filter(is_notified=False, notification_attempts__lt=RETRY_TIMES)
-            logger.debug("TxNotification number: {}".format(notifications.count()))
             self.start_notify(notifications)
             self.last_seen_block = best_block
 
@@ -146,40 +118,40 @@ class TxNotifyDaemon(GcoinRPCMixin):
 
 class AddressNotifyDaemon(GcoinRPCMixin):
 
-    def _get_callback_func(self, notification, total):
-        def callback(response):
-            self.count += 1
-            logger.debug("-"*20)
-            logger.debug("Request url: {}".format(response.request.url))
-            logger.debug("Request effective url: {}".format(response.effective_url))
-            logger.debug("Response code: {}".format(response.code))
-            logger.debug("Notification id: {}".format(notification.id))
-            if response.code == 200:
+    def call_request(self, post_data, notification):
+        headers = {'content-type': "application/x-www-form-urlencoded"}
+
+        try:
+            response = requests.post(notification.subscription.callback_url,
+                                     headers=headers,
+                                     data=post_data
+                                     )
+            if response.status_code == 200:
                 AddressNotification.objects.filter(id=notification.id).update(
-                     is_notified=True,
-                     notification_attempts=F('notification_attempts') + 1,
-                     notification_time=timezone.now()
+                    is_notified=True,
+                    notification_attempts=F('notification_attempts') + 1,
+                    notification_time=timezone.now()
                 )
             else:
                 AddressNotification.objects.filter(id=notification.id).update(
-                     notification_attempts=F('notification_attempts') + 1,
+                    notification_attempts=F('notification_attempts') + 1,
                 )
-
-            if self.count == total:
-                ioloop.IOLoop.instance().stop()
-        return callback
+        except Exception as e:
+            logger.error(e)
+            logger.error("Request url: {}".format(notification.subscription.callback_url))
+            logger.error("Response code: {}".format(response.status_code))
+            logger.error("Notification id: {}".format(notification.id))
+            try:
+                AddressNotification.objects.filter(id=notification.id).update(
+                    notification_attempts=F('notification_attempts') + 1,
+                )
+            except Exception as e:
+                logger.error(e)
 
     def start_notify(self):
-        notifications = list(AddressNotification.objects
-                             .filter(is_notified=False, notification_attempts__lt=RETRY_TIMES)
-                             .prefetch_related('subscription'))
-        if not notifications:
-            return
 
-        self.count = 0
-        client = AsyncHTTPClient()
-        headers = {'content-type': "application/x-www-form-urlencoded"}
-        total = len(notifications)
+        notifications = AddressNotification.objects.filter(is_notified=False, notification_attempts__lt=RETRY_TIMES).prefetch_related('subscription')
+        notifications = list(notifications)
 
         for notification in notifications:
             post_data = {
@@ -187,40 +159,26 @@ class AddressNotifyDaemon(GcoinRPCMixin):
                 'subscription_id': notification.subscription.id,
                 'tx_hash': notification.tx_hash,
             }
-            request = HTTPRequest(
-                          url=notification.subscription.callback_url,
-                          headers=headers,
-                          method='POST',
-                          body=urllib.urlencode(post_data),
-                          connect_timeout=180,
-                          request_timeout=180
-                      )
 
-            client.fetch(request, self._get_callback_func(notification, total))
-
-        # block until callback calls ioloop.IOLoop.instance().stop()
-        ioloop.IOLoop.instance().start()
+            self.call_request(post_data, notification)
 
     def run_forever(self):
 
         while True:
-            time.sleep(SLEEP_TIME)
-
             # get new blocks since last round
             new_blocks = self.get_new_blocks()
 
             if not new_blocks:
                 continue
-
             # create a address -> txs map from new blocks
-            addr_txs_map = self.create_address_txs_map(new_blocks)
-
-            # create AddressNotification instance in database
-            self.create_notifications(addr_txs_map)
-
-            self.start_notify()
-
-            self.set_last_seen_block(new_blocks[-1]['hash'])
+            for block in new_blocks:
+                addr_txs_map = self.create_address_txs_map(block)
+                if bool(addr_txs_map):
+                    # create AddressNotification instance in database
+                    self.create_notifications(addr_txs_map)
+                    self.start_notify()
+                self.set_last_seen_block(block['hash'])
+            time.sleep(SLEEP_TIME)
 
     def get_new_blocks(self):
         """
@@ -240,51 +198,53 @@ class AddressNotifyDaemon(GcoinRPCMixin):
         block = best_block
         new_blocks = []
         if block['hash'] == last_seen_block['hash']:
-            logger.debug("no new blocks since last update")
             return new_blocks
 
         while block['hash'] != last_seen_block['hash']:
             new_blocks.append(block)
             block = self.get_block(block['previousblockhash'])
-        logger.debug('{} new blocks since last update'.format(len(new_blocks)))
         return new_blocks[::-1]
 
-    def create_address_txs_map(self, new_blocks):
+    def create_address_txs_map(self, block):
         addr_txs_map = {}
-        for block in new_blocks:
-            # Note: this for loop can be optimized if core supports rpc to get all tx in a block
+        # Note: this for loop can be optimized if core supports rpc to get all tx in a block
+        try:
             for tx_hash in block['tx']:
                 tx = self.get_transaction(tx_hash)
 
                 # find all the addresses that related to this tx
                 related_addresses = self.get_related_addresses(tx)
-
                 for address in related_addresses:
                     if address in addr_txs_map:
                         addr_txs_map[address].append(tx)
                     else:
                         addr_txs_map[address] = [tx]
+        except Exception as e:
+            logger.error(e)
 
         return addr_txs_map
 
     def create_notifications(self, addr_txs_map):
-        subscriptions = AddressSubscription.objects.all()
-        new_notifications = []
+        try:
+            subscriptions = AddressSubscription.objects.all()
+            new_notifications = []
 
-        # Only the address that is in addr_txs_map and subscription needs to be notified,
-        # so iterate through the small one is more efficient
-        if len(addr_txs_map) < subscriptions.count():
-            for address, txs in addr_txs_map.iteritems():
-                for tx in txs:
-                    for subscription in subscriptions.filter(address=address):
-                        new_notifications.append(AddressNotification(subscription=subscription, tx_hash=tx.txid))
-        else:
-            for subscription in subscriptions:
-                if subscription.address in addr_txs_map:
-                    for tx in addr_txs_map[subscription.address]:
-                        new_notifications.append(AddressNotification(subscription=subscription, tx_hash=tx.txid))
+            # Only the address that is in addr_txs_map and subscription needs to be notified,
+            # so iterate through the small one is more efficient
+            if len(addr_txs_map) < subscriptions.count():
+                for address, txs in addr_txs_map.iteritems():
+                    for tx in txs:
+                        for subscription in subscriptions.filter(address=address):
+                            new_notifications.append(AddressNotification(subscription=subscription, tx_hash=tx.txid))
+            else:
+                for subscription in subscriptions:
+                    if subscription.address in addr_txs_map:
+                        for tx in addr_txs_map[subscription.address]:
+                            new_notifications.append(AddressNotification(subscription=subscription, tx_hash=tx.txid))
 
-        AddressNotification.objects.bulk_create(new_notifications)
+            AddressNotification.objects.bulk_create(new_notifications)
+        except Exception as e:
+            logger.error(e)
 
     def get_related_addresses(self, tx):
         if tx.type == 'NORMAL' and 'coinbase' in tx.vin[0]:
@@ -313,12 +273,22 @@ class AddressNotifyDaemon(GcoinRPCMixin):
         return script_pub_key.get('addresses', [])
 
     def set_last_seen_block(self, block_hash):
-        LastSeenBlock.objects.create(name='AddressNotifyDaemon', block_hash=block_hash)
+        try:
+            lastSeenBlock = LastSeenBlock.objects.filter(name='AddressNotifyDaemon').first()
+            lastSeenBlock.name = 'AddressNotifyDaemon'
+            lastSeenBlock.block_hash = block_hash
+            lastSeenBlock.save()
+        except Exception as e:
+            logger.error(e)
 
     def get_last_seen_block(self):
         try:
-            last_block = LastSeenBlock.objects.filter(name='AddressNotifyDaemon').latest('id')
-            return self.conn.getblock(last_block.block_hash)
-        except LastSeenBlock.DoesNotExist:
-            # return the genesis block if no last seen block
-            return self.conn.getblock(self.conn.getblockhash(0))
+            last_block = LastSeenBlock.objects.filter(name='AddressNotifyDaemon').first()
+            if last_block:
+                return self.conn.getblock(last_block.block_hash)
+            else:
+                genesis_block = self.conn.getblock(self.conn.getblockhash(0))
+                LastSeenBlock.objects.create(name='AddressNotifyDaemon', block_hash=genesis_block['hash'])
+                return genesis_block
+        except LastSeenBlock.DoesNotExist as e:
+            logger.error(e)

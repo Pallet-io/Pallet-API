@@ -29,7 +29,7 @@ class AddressSubscription(Subscription):
             ('id', self.id),
             ('address', self.address),
             ('callback_url', self.callback_url),
-            ('created_time', self.created_time)
+            ('created_time', self.created_time.strftime('%d-%m-%Y %H:%M:%S'))
         ])
 
 
@@ -48,7 +48,7 @@ class TxSubscription(Subscription):
             ('tx_hash', self.tx_hash),
             ('confirmation_count', self.confirmation_count),
             ('callback_url', self.callback_url),
-            ('created_time', self.created_time)
+            ('created_time', self.created_time.strftime('%d-%m-%Y %H:%M:%S'))
         ])
 
 
@@ -79,6 +79,12 @@ class LastSeenBlock(models.Model):
         max_length=64,
         validators=[RegexValidator(r'^[0-9a-fA-F]{64}$')],
     )
+
+    def as_dic(self):
+        return OrderedDict([
+            ('name', self.name),
+            ('block_hash', self.block_hash),
+        ])
 
 
 class TxNotification(Notification):

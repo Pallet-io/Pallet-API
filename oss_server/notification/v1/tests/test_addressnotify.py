@@ -548,12 +548,12 @@ class AddressNotifyDaemonTestCase(TestCase):
 
         daemon = AddressNotifyDaemon()
         expected_map = {
+            '1A4ATaSggTSxrce1sgGP3Aw3mLM4XZprF': [
+                "0c70b2b5e6c6618bd397f2d4024367d19264093e5c603d483644f20c183eaf7a",
+            ],
             '1GvRsoxx67CzRxvMXofDEVSTX4m29V9kE5': [
                 "7cd0c5ac40c6391a982801f1b05df48f056f3fc774543f3bf0fb2568c0b0c566",
                 "1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2",
-            ],
-            '1A4ATaSggTSxrce1sgGP3Aw3mLM4XZprF': [
-                "0c70b2b5e6c6618bd397f2d4024367d19264093e5c603d483644f20c183eaf7a",
             ],
             '1Kywza1jgdacR5Wb1xzviTb76hwKyWQjU': [
                 "1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2",
@@ -561,7 +561,8 @@ class AddressNotifyDaemonTestCase(TestCase):
                 "0c70b2b5e6c6618bd397f2d4024367d19264093e5c603d483644f20c183eaf7a",
             ]
         }
-        address_txs_map = daemon.create_address_txs_map(self.blocks[2:3])
+
+        address_txs_map = daemon.create_address_txs_map(self.blocks[2:3][0])
         self.assertEqual(set(address_txs_map.keys()), set(expected_map.keys()))
         for address, txs in address_txs_map.iteritems():
             self.assertEqual(set([tx.txid for tx in txs]), set(expected_map[address]))
@@ -595,17 +596,7 @@ class AddressNotifyDaemonTestCase(TestCase):
             notifications.filter(tx_hash="1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2").exists()
         )
 
-    @mock.patch('notification.daemon.ioloop.IOLoop.instance')
-    @mock.patch('notification.daemon.AsyncHTTPClient')
-    def test_start_notify(self, mock_asynchttpclient, mock_ioloop_instance):
-
-        # mock client.fetch
-        mock_asynchttpclient_instance = mock.MagicMock(fetch=mock.MagicMock())
-        mock_asynchttpclient.return_value = mock_asynchttpclient_instance
-
-        # mock ioloop.IOLoop.instance().start() and ioloop.IOLoop.instance().stop()
-        mock_ioloop_instance_obj = mock.MagicMock(start=mock.MagicMock(), stop=mock.MagicMock())
-        mock_ioloop_instance.return_value = mock_ioloop_instance_obj
+    def test_start_notify(self):
 
         # prepare notification to notify
         AddressNotification.objects.bulk_create([
@@ -621,24 +612,7 @@ class AddressNotifyDaemonTestCase(TestCase):
         daemon = AddressNotifyDaemon()
         daemon.start_notify()
 
-        notifications = AddressNotification.objects.filter(is_notified=False)
-        # test fetch call
-        call_list = mock_asynchttpclient_instance.fetch.call_args_list
-        requests = []
-        callback_funcs = []
-        for index, notification in enumerate(notifications):
-            request = call_list[index][0][0]
-            requests.append(request)
-            callback_funcs.append(call_list[index][0][1])
-            self.assertEqual(request.url, notification.subscription.callback_url)
-
-        # mock responses and manually call all callback_funcs
-        responses = [
-            HTTPResponse(request=requests[0], code=200),
-            HTTPResponse(request=requests[1], code=404)
-        ]
-        for index, callback in enumerate(callback_funcs):
-            callback(responses[index])
+        notifications = AddressNotification.objects.filter(is_notified=True)
 
         for notification in notifications:
             notification.refresh_from_db()
@@ -647,28 +621,33 @@ class AddressNotifyDaemonTestCase(TestCase):
         self.assertTrue(notifications[0].is_notified)
         self.assertEqual(notifications[0].notification_attempts, 1)
 
-        self.assertFalse(notifications[1].is_notified)
+        self.assertTrue(notifications[1].is_notified)
         self.assertEqual(notifications[1].notification_attempts, 1)
 
-        # start and stop is called once and only once
-        self.assertEqual(mock_ioloop_instance_obj.stop.call_count, 1)
-        self.assertTrue(mock_ioloop_instance_obj.start.call_count, 1)
+    def test_start_notify_no_notifications(self):
 
-    @mock.patch('notification.daemon.ioloop.IOLoop.instance')
-    @mock.patch('notification.daemon.AsyncHTTPClient')
-    def test_start_notify_no_notifications(self, mock_asynchttpclient, mock_ioloop_instance):
-
-        # mock client.fetch
-        mock_asynchttpclient_instance = mock.MagicMock(fetch=mock.MagicMock())
-        mock_asynchttpclient.return_value = mock_asynchttpclient_instance
-
-        # mock ioloop.IOLoop.instance().start() and ioloop.IOLoop.instance().stop()
-        mock_ioloop_instance_obj = mock.MagicMock(start=mock.MagicMock(), stop=mock.MagicMock())
-        mock_ioloop_instance.return_value = mock_ioloop_instance_obj
-
+        # prepare notification to notify
+        AddressNotification.objects.bulk_create([
+            AddressNotification(
+                subscription=self.address_subscription1,
+                tx_hash="7cd0c5ac40c6391a982801f1b05df48f056f3fc774543f3bf0fb2568c0b0c566"
+            ),
+            AddressNotification(
+                subscription=self.address_subscription1,
+                tx_hash="1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2"
+            )
+        ])
         daemon = AddressNotifyDaemon()
-        daemon.start_notify()
 
-        self.assertFalse(mock_ioloop_instance_obj.start.called)
-        self.assertFalse(mock_ioloop_instance_obj.stop.called)
+        notifications = AddressNotification.objects.filter(is_notified=False)
+
+        for notification in notifications:
+            notification.refresh_from_db()
+
+        # test notification instance is updated in callback func
+        self.assertFalse(notifications[0].is_notified)
+        self.assertEqual(notifications[0].notification_attempts, 0)
+
+        self.assertFalse(notifications[1].is_notified)
+        self.assertEqual(notifications[1].notification_attempts, 0)
 

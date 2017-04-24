@@ -1,5 +1,0 @@
-coverage
-django-jenkins
-flake8
-pep8
-pylint

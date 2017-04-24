@@ -11,6 +11,8 @@ def setUpModule():
     # load block file to DB
     updater = BlockDBUpdater(os.path.dirname(os.path.realpath(__file__)))
     updater.update()
+    Tx.objects.filter(type=2).update(type=48)
+    Tx.objects.filter(type=3).update(type=32)
 
 
 def tearDownModule():
@@ -490,7 +492,7 @@ class GetAddressTxsTest(TestCase):
             self.assertEqual(tx['type'], 'MINT')
 
         # tx type LICENSE
-        url = '/explorer/v1/transactions/address/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY?tx_type=2'
+        url = '/explorer/v1/transactions/address/1FPWFMPvYNTBx3fJYVmbFyhKtfi4QPQ6MY?tx_type=48'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(len(response.json()['txs']), 2)
@@ -498,7 +500,7 @@ class GetAddressTxsTest(TestCase):
             self.assertEqual(tx['type'], 'LICENSE')
 
         # tx type VOTE
-        url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t?tx_type=3'
+        url = '/explorer/v1/transactions/address/1Brqrjvj9UojrojRvd6diGYxEk3L4Q1b3t?tx_type=32'
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(len(response.json()['txs']), 1)

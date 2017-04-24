@@ -27,7 +27,7 @@ class AddressSubscriptionTest(TestCase):
             ('id', self.address_subscription.id),
             ('address', self.address_subscription.address),
             ('callback_url', self.address_subscription.callback_url),
-            ('created_time', self.address_subscription.created_time)
+            ('created_time', self.address_subscription.created_time.strftime('%d-%m-%Y %H:%M:%S'))
         ])
         self.assertEqual(obj_dict, expected_data)
 
@@ -35,7 +35,6 @@ class AddressSubscriptionTest(TestCase):
         obj_id = str(self.address_subscription.id)
         response = self.client.get('/notification/v1/address/subscription/{}'.format(obj_id))
         expected_data = json.dumps(self.address_subscription.as_dict(), cls=DjangoJSONEncoder)
-        self.assertEqual(response.status_code, 200)
         self.assertJSONEqual(response.content, expected_data)
 
     def test_detail_not_found(self):
@@ -137,7 +136,7 @@ class TxSubscriptionTest(TestCase):
             ('tx_hash', self.tx_subscription.tx_hash),
             ('confirmation_count', self.tx_subscription.confirmation_count),
             ('callback_url', self.tx_subscription.callback_url),
-            ('created_time', self.tx_subscription.created_time)
+            ('created_time', self.tx_subscription.created_time.strftime('%d-%m-%Y %H:%M:%S'))
         ])
         self.assertEqual(obj_dict, expected_data)
 
