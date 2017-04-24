@@ -54,8 +54,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'oss_server.wsgi.application'
 
-DATABASE_ROUTERS = ['explorer.router.ExplorerRouter']
-
 
 # Password validation
 # https://docs.djangoproject.com/en/1.9/ref/settings/#auth-password-validators

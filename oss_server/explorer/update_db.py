@@ -18,21 +18,18 @@ BLK_DIR = settings.BLK_DIR
 class BlockDbException(Exception):
     """Exception for block db contents."""
 
-
 class BlockUpdateDaemon(object):
 
-    def __init__(self, sleep_time=15, blk_dir=BLK_DIR, batch_num=50):
+    def __init__(self, sleep_time=5, blk_dir=BLK_DIR, batch_num=50):
         self.blk_dir = blk_dir
         self.batch_num = batch_num
         self.sleep_time = sleep_time
+        self.updater = BlockDBUpdater(self.blk_dir, self.batch_num)
 
     def run_forever(self):
         while True:
-            logger.info('-'*60)
-            logger.info('Start a new update!')
-            updater = BlockDBUpdater(self.blk_dir, self.batch_num)
             try:
-                updater.update()
+                self.updater.update()
             except Exception as e:
                 logger.exception('Error when updater.update(): {}'.format(e))
             sleep(self.sleep_time)
@@ -50,8 +47,6 @@ class BlockDBUpdater(object):
         # there's a following blk file to read. If so, continue to parse the file.
         while True:
             file_path, file_offset = self._get_blk_file_info()
-            logger.info('Update from File path: {}; File offset: {}'.format(file_path, file_offset))
-
             self._parse_raw_block_to_db(file_path, file_offset)
 
             file_path, file_offset = self._get_next_blk_file_info(), 0
@@ -100,23 +95,31 @@ class BlockDBUpdater(object):
         txout_with_txin.filter(tx_in__tx__block__in_longest=1).update(spent=1)
 
     def _parse_raw_block_to_db(self, file_path, file_offset):
-        with open(file_path, 'rb') as blockchain:
-            blockchain.seek(file_offset)
+        try:
+            with open(file_path, 'rb') as blockchain:
+                blockchain.seek(file_offset)
 
-            blocks = []
-            for raw_block in self._parse_raw_block(blockchain):
-                blocks.append(raw_block)
-                # Use atomic transaction for every `batch_num` blocks.
-                if len(blocks) == self.batch_num:
-                    self._batch_update_blocks(blockchain, blocks)
-                    blocks = []
+                blocks = []
+                for raw_block in self._parse_raw_block(blockchain):
+                    blocks.append(raw_block)
+                    # Use atomic transaction for every `batch_num` blocks.
+                    if len(blocks) == self.batch_num:
+                        self._batch_update_blocks(blockchain, blocks)
+                        blocks = []
 
-            self._batch_update_blocks(blockchain, blocks)
+                self._batch_update_blocks(blockchain, blocks)
+        except Exception, e:
+            logger.error('Failed to read blk files: ' + file_path)
 
     def _batch_update_blocks(self, blockchain, block_batch):
-        with transaction.atomic('explorer_db'):
-            self._store_blocks(blockchain, block_batch)
-            self._update_chain_related_info()
+        try:
+            with transaction.atomic():
+                self._store_blocks(blockchain, block_batch)
+                self._update_chain_related_info()
+        except Exception, e:
+            logger.error('Failed to store blocks: ' + str(e) + '\n' +
+                         str(blockchain) + '\n' +
+                         str(block_batch))
 
     def _parse_raw_block(self, blockchain_file):
         continue_parsing = True
@@ -160,7 +163,7 @@ class BlockDBUpdater(object):
             block_db.prev_block = prev_block
             block_db.chain_work = prev_block.chain_work + blockheader.blockWork
             block_db.height = prev_block.height + 1
-        except BlockDb.DoesNotExist:
+        except Exception as e:
             block_db.chain_work = blockheader.blockWork
             block_db.height = 0
 
