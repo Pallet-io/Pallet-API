@@ -139,7 +139,6 @@ class AddressNotifyDaemon(GcoinRPCMixin):
         except Exception as e:
             logger.error(e)
             logger.error("Request url: {}".format(notification.subscription.callback_url))
-            logger.error("Response code: {}".format(response.status_code))
             logger.error("Notification id: {}".format(notification.id))
             try:
                 AddressNotification.objects.filter(id=notification.id).update(

@@ -2,6 +2,8 @@ from .base import *
 
 DEBUG = True
 
+SERVER_CONFIG_ENV = 'oss_server.settings.' + 'test'
+
 INSTALLED_APPS += [
     'base',
     'explorer',

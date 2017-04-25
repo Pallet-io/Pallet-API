@@ -4,7 +4,6 @@ from django.test import TestCase
 
 import mock
 from gcoinrpc.data import TransactionInfo
-import requests
 import requests_mock
 
 from notification.daemon import TxNotifyDaemon
@@ -218,7 +217,10 @@ class TxNotifyDaemonTestCase(TestCase):
         self.assertFalse(updated_n2.is_notified)
         self.assertEqual(updated_n2.notification_attempts, 1)
 
-    def test_start_notify_no_notification(self):
+    @requests_mock.mock()
+    def test_start_notify_no_notification(self, m):
+
+        m.post('http://callback1.com', text='data')
 
         s2 = TxSubscription.objects.create(
             tx_hash='ce1fe377472da26d2561e36fbdc8d8a67e2e59e2d55da99dab77d5903aeedf2c',
