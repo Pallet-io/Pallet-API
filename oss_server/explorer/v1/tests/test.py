@@ -128,11 +128,11 @@ class GetTxByHashTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json()['tx']['hash'],
                          '7fb50dd5ff00d6a929ef39f51e7821ce78d141f6d45e7d93918cd5811acaa36b')
-        self.assertEqual(response.json()['tx']['block_hash'],
+        self.assertEqual(response.json()['tx']['blockhash'],
                          '000001618d6fae9349bed836a56422bd161103ff44083bf9ff58358c8d882191')
         self.assertEqual(response.json()['tx']['type'], 'NORMAL')
         # txin
-        self.assertEqual(response.json()['tx']['vins'][0]['tx_id'], None)
+        self.assertEqual(response.json()['tx']['vins'][0]['tx_hash'], None)
         # txout
         self.assertEqual(int(response.json()['tx']['vouts'][0]['color']), 0)
         self.assertEqual(int(response.json()['tx']['vouts'][0]['amount']), 0)
@@ -144,11 +144,11 @@ class GetTxByHashTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json()['tx']['hash'],
                          '7b641d130b2348c1262bceb0dba586f475b0ff07f2eba37e3f71bcfcf0e7e7ca')
-        self.assertEqual(response.json()['tx']['block_hash'],
+        self.assertEqual(response.json()['tx']['blockhash'],
                          '0000035d2e4d972e94f11316c5f1a09114a955ce6a959f297d3efcb65292bd9e')
         self.assertEqual(response.json()['tx']['type'], 'MINT')
         # txin
-        self.assertEqual(response.json()['tx']['vins'][0]['tx_id'], None)
+        self.assertEqual(response.json()['tx']['vins'][0]['tx_hash'], None)
         # txout
         self.assertEqual(int(response.json()['tx']['vouts'][0]['color']), 1)
         self.assertEqual(int(response.json()['tx']['vouts'][0]['amount']), 10000000000)
@@ -160,11 +160,11 @@ class GetTxByHashTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json()['tx']['hash'],
                          '5480bb28d079a4a4f7c4e2ac78393d710b689b17ff60bdc0f42464ae7ae4d4f7')
-        self.assertEqual(response.json()['tx']['block_hash'],
+        self.assertEqual(response.json()['tx']['blockhash'],
                          '0000098d2547428e80638fb70668166878dbefebcffd92501d69764a32a30426')
         self.assertEqual(response.json()['tx']['type'], 'LICENSE')
         # txin
-        self.assertEqual(response.json()['tx']['vins'][0]['tx_id'],
+        self.assertEqual(response.json()['tx']['vins'][0]['tx_hash'],
                          '9ff002170a51523cc60239fdb50426def43a61658f71cec865bbc8f468031215')
         # txout
         self.assertEqual(int(response.json()['tx']['vouts'][0]['color']), 2)
@@ -179,11 +179,11 @@ class GetTxByHashTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json()['tx']['hash'],
                          '7d6b25544e571675429ee772c677fbc1c4984c8e25c29bb30f5892c1d5cedb6a')
-        self.assertEqual(response.json()['tx']['block_hash'],
+        self.assertEqual(response.json()['tx']['blockhash'],
                          '00000efca7c5fd0154886d32f6352a67cde96e1d55ae7ddddb57315d0b6dc90b')
         self.assertEqual(response.json()['tx']['type'], 'VOTE')
         # txin, vote would use 1 color 0
-        self.assertEqual(response.json()['tx']['vins'][0]['tx_id'],
+        self.assertEqual(response.json()['tx']['vins'][0]['tx_hash'],
                          '354c390658fd4fcf760493006d41132dd5a75f9d3b018777d1d2b78a8c2b790c')
         # txout
         self.assertEqual(int(response.json()['tx']['vouts'][0]['color']), 0)
@@ -196,15 +196,15 @@ class GetTxByHashTest(TestCase):
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json()['tx']['hash'],
                          '64e8cd9f81e795f20c7c64951fc4540f55e8d89a70da363002dff5e21ed5b352')
-        self.assertEqual(response.json()['tx']['block_hash'],
+        self.assertEqual(response.json()['tx']['blockhash'],
                          '00000b44acf5951351822e5f065194285bd3df09f025ef60c019d5cbbcdaa8db')
         self.assertEqual(response.json()['tx']['type'], 'NORMAL')
         # txin, three inputs
-        self.assertEqual(response.json()['tx']['vins'][0]['tx_id'],
+        self.assertEqual(response.json()['tx']['vins'][0]['tx_hash'],
                          'e351dcc3f5fe6bb7b9abae54886a536c35726e74f77bf473da29c970f87a8d2a')
-        self.assertEqual(response.json()['tx']['vins'][1]['tx_id'],
+        self.assertEqual(response.json()['tx']['vins'][1]['tx_hash'],
                          '17545d685480bc7cc67a164d861a88ea5630fc01d9a35c4f72e9392948664f08')
-        self.assertEqual(response.json()['tx']['vins'][2]['tx_id'],
+        self.assertEqual(response.json()['tx']['vins'][2]['tx_hash'],
                          '53b4322c4c9a0288e0349eb4bf8951131c4e4201d8802bb623cc84cf06c7191f')
         # txout
         self.assertEqual(int(response.json()['tx']['vouts'][0]['color']), 1)
