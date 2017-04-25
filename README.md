@@ -83,7 +83,7 @@ DATABASES = {
 
 The data forlder, which are usually located under `~/.gcoin/main/blocks`
 
-It is the key point for entire OSS project. The Django command called `blockupdate` will read all the blockchain data under this forlder every 5 seconds by default and save these data to specified database.
+It is the key point for entire OSS project. The Django command called `blockupdate` will read all the blockchain data under this forlder every second by default and save these data to specified database.
 
 Run `./manage.py blockupdate` to sync blockchain indefinitely.
 
@@ -94,8 +94,12 @@ Run `./manage.py test --settings=oss_server.settings.test` for a standalone unit
 Run `./manage.py test` will create a test database specified in setting.py and destroy it after compeleting the test.
 
 ## Run server
-### Activate virtualenv
-    source env/bin/activate
+
 ### Start server
     ./oss_server/manage.py runserver <address>:<port>
 
+### Start services
+
+	./manage.py blockupdate
+	./manage.py txnotify
+	./manage.py addressnotify

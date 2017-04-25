@@ -8,4 +8,3 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         daemon = TxNotifyDaemon()
         daemon.run_forever()
-

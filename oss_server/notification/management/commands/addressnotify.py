@@ -9,4 +9,3 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         daemon = AddressNotifyDaemon()
         daemon.run_forever()
-
