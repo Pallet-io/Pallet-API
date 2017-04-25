@@ -2,12 +2,13 @@ import logging
 import os
 from time import sleep
 
+from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import transaction
+from django.db import connections
 
 from blocktools.block import Block
 from blocktools.blocktools import *
-from django.conf import settings
 
 from .models import Address, Datadir, Tx, TxIn, TxOut
 from .models import Block as BlockDb
@@ -15,12 +16,16 @@ from .models import Block as BlockDb
 logger = logging.getLogger(__name__)
 BLK_DIR = settings.BLK_DIR
 
+def close_old_connections():
+    for conn in connections.all():
+        conn.close_if_unusable_or_obsolete()
+
 class BlockDbException(Exception):
     """Exception for block db contents."""
 
 class BlockUpdateDaemon(object):
 
-    def __init__(self, sleep_time=5, blk_dir=BLK_DIR, batch_num=50):
+    def __init__(self, sleep_time=1, blk_dir=BLK_DIR, batch_num=50):
         self.blk_dir = blk_dir
         self.batch_num = batch_num
         self.sleep_time = sleep_time
@@ -32,6 +37,8 @@ class BlockUpdateDaemon(object):
                 self.updater.update()
             except Exception as e:
                 logger.exception('Error when updater.update(): {}'.format(e))
+
+            close_old_connections()
             sleep(self.sleep_time)
 
 
@@ -45,13 +52,9 @@ class BlockDBUpdater(object):
     def update(self):
         # Read the blk file (possibly from last read position) as many as possible, and check if
         # there's a following blk file to read. If so, continue to parse the file.
-        while True:
-            file_path, file_offset = self._get_blk_file_info()
-            self._parse_raw_block_to_db(file_path, file_offset)
-
-            file_path, file_offset = self._get_next_blk_file_info(), 0
-            if not file_path:
-                break
+        file_path, file_offset = self._get_blk_file_info()
+        self._parse_raw_block_to_db(file_path, file_offset)
+        self._get_next_blk_file_info()
 
     def _update_chain_related_info(self):
         self.blocks_hash_cache = []

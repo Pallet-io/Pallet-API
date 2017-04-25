@@ -2,11 +2,11 @@ import logging
 import time
 
 from django.conf import settings
+from django.db import connections
 from django.db.models import F
 from django.utils import timezone
 
 from gcoinrpc import connect_to_remote
-from gcoinrpc.exceptions import InvalidAddressOrKey
 import requests
 
 from notification.models import AddressSubscription, TxSubscription
@@ -17,6 +17,10 @@ from notification.models import LastSeenBlock
 logger = logging.getLogger(__name__)
 RETRY_TIMES = 5
 SLEEP_TIME = 5
+
+def close_old_connections():
+    for conn in connections.all():
+        conn.close_if_unusable_or_obsolete()
 
 def get_rpc_connection():
     return connect_to_remote(settings.GCOIN_RPC['user'],
@@ -88,31 +92,32 @@ class TxNotifyDaemon(GcoinRPCMixin):
     def run_forever(self, test=False):
 
         while True:
-            best_block = self.get_best_block()
+            try:
+                best_block = self.get_best_block()
 
-            if self.last_seen_block is None or self.last_seen_block['hash'] != best_block['hash']:
+                if self.last_seen_block is None or self.last_seen_block['hash'] != best_block['hash']:
 
-                new_notifications = []
-                for tx_subscription in TxSubscription.objects.filter(txnotification=None):
-                    logger.debug('check tx hash: {}'.format(tx_subscription.tx_hash))
-                    try:
+                    new_notifications = []
+                    tx_subscriptions = TxSubscription.objects.filter(txnotification=None)
+                    for tx_subscription in tx_subscriptions:
+                        logger.debug('check tx hash: {}'.format(tx_subscription.tx_hash))
                         tx = self.get_transaction(tx_subscription.tx_hash)
-                    except InvalidAddressOrKey:
-                        # transaction not found, just skip
-                        continue
+                        if hasattr(tx, 'confirmations') and tx.confirmations >= tx_subscription.confirmation_count:
+                            new_notifications.append(TxNotification(subscription=tx_subscription))
 
-                    if hasattr(tx, 'confirmations') and tx.confirmations >= tx_subscription.confirmation_count:
-                        new_notifications.append(TxNotification(subscription=tx_subscription))
+                    TxNotification.objects.bulk_create(new_notifications)
 
-                TxNotification.objects.bulk_create(new_notifications)
-
-            notifications = TxNotification.objects.filter(is_notified=False, notification_attempts__lt=RETRY_TIMES)
-            self.start_notify(notifications)
-            self.last_seen_block = best_block
+                notifications = TxNotification.objects.filter(is_notified=False,
+                                                              notification_attempts__lt=RETRY_TIMES)
+                self.start_notify(notifications)
+                self.last_seen_block = best_block
+            except Exception as e:
+                logger.error(e)
 
             if test:
                 return
 
+            close_old_connections()
             time.sleep(SLEEP_TIME)
 
 
@@ -164,19 +169,22 @@ class AddressNotifyDaemon(GcoinRPCMixin):
     def run_forever(self):
 
         while True:
-            # get new blocks since last round
-            new_blocks = self.get_new_blocks()
+            try:
+                # get new blocks since last round
+                new_blocks = self.get_new_blocks()
+                if new_blocks:
+                    # create a address -> txs map from new blocks
+                    for block in new_blocks:
+                        addr_txs_map = self.create_address_txs_map(block)
+                        if bool(addr_txs_map):
+                            # create AddressNotification instance in database
+                            self.create_notifications(addr_txs_map)
+                            self.start_notify()
+                        self.set_last_seen_block(block['hash'])
+            except Exception as e:
+                logger.error(e)
 
-            if not new_blocks:
-                continue
-            # create a address -> txs map from new blocks
-            for block in new_blocks:
-                addr_txs_map = self.create_address_txs_map(block)
-                if bool(addr_txs_map):
-                    # create AddressNotification instance in database
-                    self.create_notifications(addr_txs_map)
-                    self.start_notify()
-                self.set_last_seen_block(block['hash'])
+            close_old_connections()
             time.sleep(SLEEP_TIME)
 
     def get_new_blocks(self):
