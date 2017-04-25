@@ -4,7 +4,6 @@ from django.test import TestCase
 
 import mock
 from gcoinrpc.data import TransactionInfo
-from tornado.httpclient import HTTPResponse
 
 from notification.daemon import AddressNotifyDaemon
 from notification.models import AddressNotification, AddressSubscription, LastSeenBlock
