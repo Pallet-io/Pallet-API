@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 import mock
+import requests_mock
 from gcoinrpc.data import TransactionInfo
 
 from notification.daemon import AddressNotifyDaemon
@@ -595,7 +596,10 @@ class AddressNotifyDaemonTestCase(TestCase):
             notifications.filter(tx_hash="1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2").exists()
         )
 
-    def test_start_notify(self):
+    @requests_mock.mock()
+    def test_start_notify(self, m):
+
+        m.post('http://callback.com', text='data')
 
         # prepare notification to notify
         AddressNotification.objects.bulk_create([
@@ -611,10 +615,8 @@ class AddressNotifyDaemonTestCase(TestCase):
         daemon = AddressNotifyDaemon()
         daemon.start_notify()
 
-        notifications = AddressNotification.objects.filter(is_notified=True)
-
-        for notification in notifications:
-            notification.refresh_from_db()
+        notifications = AddressNotification.objects.filter(tx_hash__in=['7cd0c5ac40c6391a982801f1b05df48f056f3fc774543f3bf0fb2568c0b0c566',
+                                                                        '1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2'])
 
         # test notification instance is updated in callback func
         self.assertTrue(notifications[0].is_notified)
@@ -638,10 +640,8 @@ class AddressNotifyDaemonTestCase(TestCase):
         ])
         daemon = AddressNotifyDaemon()
 
-        notifications = AddressNotification.objects.filter(is_notified=False)
-
-        for notification in notifications:
-            notification.refresh_from_db()
+        notifications = AddressNotification.objects.filter(tx_hash__in=['7cd0c5ac40c6391a982801f1b05df48f056f3fc774543f3bf0fb2568c0b0c566',
+                                                                        '1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2'])
 
         # test notification instance is updated in callback func
         self.assertFalse(notifications[0].is_notified)
