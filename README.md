@@ -86,6 +86,12 @@ It is the key point for entire OSS project. The Django command called `blockupda
 
 Run `./manage.py blockupdate` to sync blockchain indefinitely.
 
+## Run unit test
+
+Run `./manage.py test --settings=oss_server.settings.test` for a standalone unit test.
+
+Run `./manage.py test` will create a test database specified in setting.py and destroy it after compeleting the test.
+
 ## Run server
 ### Activate virtualenv
     source env/bin/activate
