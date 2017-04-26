@@ -12,19 +12,31 @@ stages:
   after_script:
     - docker logout $CI_REGISTRY
 
+.env_template:  &prepare_env
+  before_script:
+    - yum install -y epel-release
+    - yum install -y python-devel python-pip mariadb-devel gcc-c++.x86_64
+    - pip install -r requirements.txt
+
 test:install:
+  <<: *prepare_env
   stage: test
   image: centos:7
   script:
-    - echo "unit_test:install"
+    - yum install -y wget curl locate libtool make m4 net-tools bash-completion \
+                     openssl-devel mysql db4-devel libdb-cxx-devel \
+                     protobuf-devel boost-devel python-devel
   tags:
     - docker
 
 test:unit_test:
+  <<: *prepare_env
   stage: test
   image: centos:7
   script:
-    - echo "unit test"
+    - cd oss_server
+    - cp oss_server/settings/setting.py.default oss_server/settings/setting.py
+    - ./manage.py test --settings=oss_server.settings.test
   tags:
     - docker
 
@@ -46,7 +58,6 @@ build_image:
   only:
     - master
     - tags
-    - /^develop/
 
 system_test:
   stage: system_test
@@ -57,7 +68,6 @@ system_test:
   only:
     - master
     - tags
-    - /^develop/
 
 upload_image:
   <<: *gitlab_registry
@@ -70,7 +80,6 @@ upload_image:
     - shell
   only:
     - master
-    - /^develop/
 
 upload_tag_image:
   <<: *gitlab_registry
@@ -96,4 +105,3 @@ clean_image:
   only:
     - master
     - tags
-    - /^develop/
