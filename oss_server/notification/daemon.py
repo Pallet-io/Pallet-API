@@ -2,9 +2,10 @@ import logging
 import time
 
 from django.conf import settings
-from django.db import connections
+from django.db import connections, connection
 from django.db.models import F
 from django.utils import timezone
+from threading import Thread
 
 from gcoinrpc import connect_to_remote
 import requests
@@ -18,9 +19,11 @@ logger = logging.getLogger(__name__)
 RETRY_TIMES = 5
 SLEEP_TIME = 5
 
-def close_old_connections():
+def close_connection():
     for conn in connections.all():
         conn.close_if_unusable_or_obsolete()
+
+    connection.close()
 
 def get_rpc_connection():
     return connect_to_remote(settings.GCOIN_RPC['user'],
@@ -57,7 +60,9 @@ class TxNotifyDaemon(GcoinRPCMixin):
                               headers=headers,
                               data=post_data
                               )
+            close_connection()
             if response.status_code == 200:
+
                 TxNotification.objects.filter(id=notification.id).update(
                     is_notified=True,
                     notification_attempts=F('notification_attempts') + 1,
@@ -87,7 +92,9 @@ class TxNotifyDaemon(GcoinRPCMixin):
                 'subscription_id': notification.subscription.id,
                 'tx_hash': notification.subscription.tx_hash,
             }
-            self.call_request(post_data, notification)
+
+            thread = Thread(target=self.call_request, args=(post_data, notification, ))
+            thread.start()
 
     def run_forever(self, test=False):
 
@@ -117,7 +124,7 @@ class TxNotifyDaemon(GcoinRPCMixin):
             if test:
                 return
 
-            close_old_connections()
+            close_connection()
             time.sleep(SLEEP_TIME)
 
 
@@ -131,6 +138,7 @@ class AddressNotifyDaemon(GcoinRPCMixin):
                                      headers=headers,
                                      data=post_data
                                      )
+            close_connection()
             if response.status_code == 200:
                 AddressNotification.objects.filter(id=notification.id).update(
                     is_notified=True,
@@ -164,7 +172,8 @@ class AddressNotifyDaemon(GcoinRPCMixin):
                 'tx_hash': notification.tx_hash,
             }
 
-            self.call_request(post_data, notification)
+            thread = Thread(target=self.call_request, args=(post_data, notification,))
+            thread.start()
 
     def run_forever(self):
 
@@ -184,7 +193,7 @@ class AddressNotifyDaemon(GcoinRPCMixin):
             except Exception as e:
                 logger.error(e)
 
-            close_old_connections()
+            close_connection()
             time.sleep(SLEEP_TIME)
 
     def get_new_blocks(self):
