@@ -108,9 +108,13 @@ class TxNotifyDaemon(GcoinRPCMixin):
                     tx_subscriptions = TxSubscription.objects.filter(txnotification=None)
                     for tx_subscription in tx_subscriptions:
                         logger.debug('check tx hash: {}'.format(tx_subscription.tx_hash))
-                        tx = self.get_transaction(tx_subscription.tx_hash)
-                        if hasattr(tx, 'confirmations') and tx.confirmations >= tx_subscription.confirmation_count:
-                            new_notifications.append(TxNotification(subscription=tx_subscription))
+                        try:
+                            tx = self.get_transaction(tx_subscription.tx_hash)
+                            if hasattr(tx, 'confirmations') and tx.confirmations >= tx_subscription.confirmation_count:
+                                new_notifications.append(TxNotification(subscription=tx_subscription))
+                        except Exception as e:
+                            # transaction does not exist
+                            continue
 
                     TxNotification.objects.bulk_create(new_notifications)
 
