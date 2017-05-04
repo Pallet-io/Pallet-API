@@ -183,41 +183,6 @@ class TxNotifyDaemonTestCase(TestCase):
         self.assertEqual(notifications.count(), 0)
 
     @requests_mock.mock()
-    def test_start_notify(self, m):
-
-        m.post('http://callback1.com', text='data')
-
-        # prepare notification to notify
-        s1 = TxSubscription.objects.create(
-                tx_hash='abcce180d8aaec88f9c9f80168705aa85a02e5f82d717dbef96657078cede9c8',
-                callback_url='http://callback1.com',
-                confirmation_count=10
-            )
-        s2 = TxSubscription.objects.create(
-                tx_hash='ce1fe377472da26d2561e36fbdc8d8a67e2e59e2d55da99dab77d5903aeedf2b',
-                callback_url='http://callback2.com',
-                confirmation_count=10
-            )
-        TxNotification.objects.bulk_create([
-            TxNotification(subscription=s1),
-            TxNotification(subscription=s2)
-        ])
-        notifications = TxNotification.objects.filter(is_notified=False)
-
-        daemon = TxNotifyDaemon()
-        daemon.start_notify(notifications)
-
-        updated_n1 = TxNotification.objects.get(subscription_id=s1.id)
-        updated_n2 = TxNotification.objects.get(subscription_id=s2.id)
-
-        # test notification instance is updated in callback func
-        self.assertTrue(updated_n1.is_notified)
-        self.assertEqual(updated_n1.notification_attempts, 1)
-
-        self.assertFalse(updated_n2.is_notified)
-        self.assertEqual(updated_n2.notification_attempts, 1)
-
-    @requests_mock.mock()
     def test_start_notify_no_notification(self, m):
 
         m.post('http://callback1.com', text='data')

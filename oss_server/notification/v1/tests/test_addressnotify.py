@@ -596,35 +596,6 @@ class AddressNotifyDaemonTestCase(TestCase):
             notifications.filter(tx_hash="1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2").exists()
         )
 
-    @requests_mock.mock()
-    def test_start_notify(self, m):
-
-        m.post('http://callback.com', text='data')
-
-        # prepare notification to notify
-        AddressNotification.objects.bulk_create([
-            AddressNotification(
-                subscription=self.address_subscription1,
-                tx_hash="7cd0c5ac40c6391a982801f1b05df48f056f3fc774543f3bf0fb2568c0b0c566"
-            ),
-            AddressNotification(
-                subscription=self.address_subscription1,
-                tx_hash="1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2"
-            )
-        ])
-        daemon = AddressNotifyDaemon()
-        daemon.start_notify()
-
-        notifications = AddressNotification.objects.filter(tx_hash__in=['7cd0c5ac40c6391a982801f1b05df48f056f3fc774543f3bf0fb2568c0b0c566',
-                                                                        '1bf6fe6ff8e9c68a8d158d955f8c9297f364695ede31308399be1c41db294ad2'])
-
-        # test notification instance is updated in callback func
-        self.assertTrue(notifications[0].is_notified)
-        self.assertEqual(notifications[0].notification_attempts, 1)
-
-        self.assertTrue(notifications[1].is_notified)
-        self.assertEqual(notifications[1].notification_attempts, 1)
-
     def test_start_notify_no_notifications(self):
 
         # prepare notification to notify
