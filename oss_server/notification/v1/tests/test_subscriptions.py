@@ -15,7 +15,8 @@ class AddressSubscriptionTest(TestCase):
     def setUp(self):
         self.address_subscription = AddressSubscription.objects.create(
                                          address="1AceWFDUHRahFxgHDSdz89cdbZQPv6uarY",
-                                         callback_url="http://callback.com"
+                                         callback_url="http://callback.com",
+                                         confirmation="2"
                                     )
 
     def clean(self):
@@ -27,6 +28,7 @@ class AddressSubscriptionTest(TestCase):
             ('id', self.address_subscription.id),
             ('address', self.address_subscription.address),
             ('callback_url', self.address_subscription.callback_url),
+            ('confirmation', self.address_subscription.confirmation),
             ('created_time', self.address_subscription.created_time.strftime('%d-%m-%Y %H:%M:%S'))
         ])
         self.assertEqual(obj_dict, expected_data)
@@ -54,7 +56,8 @@ class AddressSubscriptionTest(TestCase):
     def test_create_view(self):
         post_data = {
             "address": "112iazuQmHL7UcfE4ftYzAD1RxpwyAQd6n",
-            "callback_url": "http://example.com"
+            "callback_url": "http://example.com",
+            "confirmation": "2"
         }
         response = self.client.post('/notification/v1/address/subscription', data=post_data)
 
@@ -79,6 +82,10 @@ class AddressSubscriptionTest(TestCase):
             "error": {
                 "type": "invalid_request_error",
                 "params": [
+                    {
+                        "message": "confirmation is required",
+                        "name": "confirmation"
+                    },
                     {
                         "name": "callback_url",
                         "message": "callback_url is invalid"
