@@ -5,7 +5,7 @@ from ..models import AddressSubscription, TxSubscription
 class AddressSubscriptionModelForm(forms.ModelForm):
     class Meta:
         model = AddressSubscription
-        fields = ['address', 'callback_url']
+        fields = ['address', 'callback_url', 'confirmation']
         error_messages = {
             'address': {
                 'required': 'address is required',
@@ -14,6 +14,9 @@ class AddressSubscriptionModelForm(forms.ModelForm):
             'callback_url': {
                 'required': 'callback_url is required',
                 'invalid': 'callback_url is invalid',
+            },
+            'confirmation': {
+                'required': 'confirmation is required',
             }
         }
 

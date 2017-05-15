@@ -23,12 +23,14 @@ class AddressSubscription(Subscription):
         max_length=34,
         validators=[validate_address]
     )
+    confirmation = models.DecimalField(max_digits=2, decimal_places=0, blank=False, null=True)
 
     def as_dict(self):
         return OrderedDict([
             ('id', self.id),
             ('address', self.address),
             ('callback_url', self.callback_url),
+            ('confirmation', self.confirmation),
             ('created_time', self.created_time.strftime('%d-%m-%Y %H:%M:%S'))
         ])
 
@@ -69,6 +71,16 @@ class AddressNotification(Notification):
         max_length=64,
         validators=[RegexValidator(r'^[0-9a-fA-F]{64}$')],
     )
+
+    callback_url = models.URLField(default='')
+    confirmation = models.DecimalField(max_digits=2, decimal_places=0, blank=False, null=True)
+    tx_hash = models.CharField(max_length=64)
+    tx = models.TextField(null=True)
+    address = models.CharField(max_length=40, default='')
+    block_height = models.DecimalField(max_digits=14, decimal_places=0, null=True)
+    block_hash = models.CharField(max_length=64, default='')
+    block = models.TextField(null=True)
+
     class Meta(Notification.Meta):
         ordering = ('created_time',)
 
