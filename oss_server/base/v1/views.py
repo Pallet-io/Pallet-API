@@ -451,6 +451,7 @@ class GeneralTxView(CsrfExemptMixin, View):
             if error_msg:
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
+        op_return_data = json_obj['op_return'] if 'op_return' in json_obj else None
         tx_info_ins = self._aggregate_inputs(json_obj['tx_info'])
         tx_info_outs = self._aggregate_outputs(json_obj['tx_info'])
 
@@ -506,5 +507,15 @@ class GeneralTxView(CsrfExemptMixin, View):
                                  'value': int(amount * 10**8),
                                  'color': color_id})
 
-        raw_tx = make_raw_tx(tx_vins, tx_vouts)
+        if op_return_data:
+            tx_vouts.append({
+                'script': mk_op_return_script(op_return_data.encode('utf8')),
+                'value': 0,
+                'color': 0
+            })
+
+            raw_tx = make_raw_tx(tx_vins, tx_vouts, TransactionType.to_number("CONTRACT"))
+        else:
+            raw_tx = make_raw_tx(tx_vins, tx_vouts)
+
         return JsonResponse({'raw_tx': raw_tx})
