@@ -451,7 +451,7 @@ class GeneralTxView(CsrfExemptMixin, View):
             if error_msg:
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
-        op_return_data = json_obj['op_return'] if 'op_return' in json_obj else None
+        op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
         tx_info_ins = self._aggregate_inputs(json_obj['tx_info'])
         tx_info_outs = self._aggregate_outputs(json_obj['tx_info'])
 
