@@ -8,7 +8,7 @@ import gcoin
 
 from .utils import address_validator
 
-__all__ = ('AddressField', 'ColorField', 'MintAmountField', 'PubkeyField', 'TxAmountField')
+__all__ = ('AddressField', 'PubkeyField', 'TxAmountField')
 
 
 def pubkey_validator(value):
@@ -25,16 +25,6 @@ class AddressField(forms.CharField):
     def __init__(self, *args, **kwargs):
         super(AddressField, self).__init__(*args, **kwargs)
         self.validators.append(address_validator)
-
-
-class ColorField(forms.IntegerField):
-    def __init__(self, *args, **kwargs):
-        super(ColorField, self).__init__(max_value=2**32-1, min_value=0, *args, **kwargs)
-
-
-class MintAmountField(forms.IntegerField):
-    def __init__(self, *args, **kwargs):
-        super(MintAmountField, self).__init__(max_value=10**10, min_value=1, *args, **kwargs)
 
 
 class PubkeyField(forms.CharField):
