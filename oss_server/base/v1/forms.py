@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from oss_server.fields import AddressField, ColorField, MintAmountField, PubkeyField, TxAmountField
+from oss_server.fields import AddressField, PubkeyField, TxAmountField
 
 class CreateSmartContractRawTxForm(forms.Form):
     from_address = AddressField(error_messages={
@@ -17,12 +17,6 @@ class CreateSmartContractRawTxForm(forms.Form):
                                'required': '`code` is required',
                                'max_length': 'length of `code` should not exceed %(limit_value)s'
                            })
-    color_id = ColorField(required=False,
-                          error_messages={
-                              'invalid': '`color_id` is invalid',
-                              'min_value': '`color_id` should be greater than or equal to %(limit_value)s',
-                              'max_value': '`color_id` should be less than or equal to %(limit_value)s'
-                          })
     amount = TxAmountField(required=False,
                            error_messages={
                                'invalid': '`amount` is invalid',
@@ -36,21 +30,9 @@ class CreateSmartContractRawTxForm(forms.Form):
                                           'max_value': '`contract_fee` should be less than or equal to %(limit_value)s'
                                       })
 
-    def clean_color_id(self):
-        color_id = self.cleaned_data['color_id']
-        if color_id == 1:
-            raise ValidationError("`color_id` can't be 1", code='invalid_color')
-        return color_id
-
     def clean(self):
         cleaned_data = super(CreateSmartContractRawTxForm, self).clean()
-        color_id = cleaned_data.get('color_id')
         amount = cleaned_data.get('amount')
-
-        if color_id and amount is None:
-            raise ValidationError('`amount` is required if `color_id` is present')
-        if amount and color_id is None:
-            raise ValidationError('`color_id` is required if `amount` is present')
 
 
 class RawTxForm(forms.Form):
@@ -61,12 +43,6 @@ class RawTxForm(forms.Form):
     to_address = AddressField(error_messages={
         'required': '`to_address` is required',
         'invalid': '`to_address` is not an address'
-    })
-    color_id = ColorField(error_messages={
-        'required': '`color_id` is required',
-        'invalid': '`color_id` is invalid',
-        'min_value': '`color_id` should be greater than or equal to %(limit_value)s',
-        'max_value': '`color_id` should be less than or equal to %(limit_value)s'
     })
     amount = TxAmountField(error_messages={
         'required': '`amount` is required',

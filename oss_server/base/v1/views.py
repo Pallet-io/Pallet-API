@@ -46,7 +46,6 @@ class CsrfExemptMixin(object):
         return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
 
 class CreateSmartContractRawTxView(CsrfExemptMixin, View):
-    FEE_COLOR = 1
     TX_FEE = 1
     DEFAULT_CONTRACT_FEE = 1
 
@@ -55,7 +54,6 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
         if form.is_valid():
             from_address = form.cleaned_data['from_address']
             to_address = form.cleaned_data['to_address']
-            color_id = form.cleaned_data['color_id']
             amount = form.cleaned_data['amount']
             code = form.cleaned_data['code']
             contract_fee = form.cleaned_data['contract_fee'] or self.DEFAULT_CONTRACT_FEE
@@ -63,34 +61,28 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
             utxos = get_rpc_connection().gettxoutaddress(from_address)
             total_fee = contract_fee + self.TX_FEE
 
-            if color_id and amount:
-                inputs = select_utxo(utxos=utxos, color=color_id, sum=amount)
+            if amount:
+                inputs = select_utxo(utxos=utxos, sum= (amount + total_fee))
                 if not inputs:
                     return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
             else:
                 inputs = []
 
-            fee_inputs = select_utxo(utxos=utxos, color=self.FEE_COLOR, sum=total_fee)
-            if not fee_inputs:
-                return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
-
-            ins = [utxo_to_txin(utxo) for utxo in (inputs + fee_inputs)]
+            ins = [utxo_to_txin(utxo) for utxo in inputs]
 
             outs = []
-            if color_id and amount:
+            if amount:
                 outs.append({
                     'address': to_address,
                     'value': int(amount * (10**8)),
-                    'color': color_id
                 })
-                change = balance_from_utxos(inputs)[color_id] - amount
+                change = balance_from_utxos(inputs) - amount
                 if change:
                     outs.append({
                         'address': from_address,
                         'value': int(change * (10**8)),
-                        'color': color_id
                     })
-            outs += self._build_txouts(from_address, to_address, code, contract_fee, fee_inputs)
+            outs += self._build_txouts(from_address, to_address, code, contract_fee)
 
             raw_tx = make_raw_tx(ins, outs, TransactionType.to_number('CONTRACT'))
             return JsonResponse({'raw_tx': raw_tx})
@@ -104,21 +96,18 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
             {
                 'address': to_address,
                 'value': int(contract_fee * (10**8)),
-                'color': self.FEE_COLOR
             },
             {
                 'script': mk_op_return_script(code),
                 'value': 0,
-                'color': 0
             }
         ]
 
-        change = balance_from_utxos(utxo_inputs)[self.FEE_COLOR] - contract_fee - self.TX_FEE
+        change = balance_from_utxos(utxo_inputs) - contract_fee - self.TX_FEE
         if change:
             outs.append({
                 'address': from_address,
                 'value': int(change * (10**8)),
-                'color': self.FEE_COLOR
             })
 
         return outs
@@ -165,54 +154,27 @@ class CreateRawTxView(View):
         if form.is_valid():
             from_address = form.cleaned_data['from_address']
             to_address = form.cleaned_data['to_address']
-            color_id = form.cleaned_data['color_id']
             amount = form.cleaned_data['amount']
             op_return_data = form.cleaned_data['op_return_data']
 
             utxos = get_rpc_connection().gettxoutaddress(from_address)
-            # Color 1 is used as fee, so here's special case for it.
-            if color_id == 1:
-                if not select_utxo(utxos, color_id, amount):
-                    return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
-                inputs = select_utxo(utxos, color_id, amount + 1)
-                if not inputs:
-                    return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
-            else:
-                inputs = select_utxo(utxos, color_id, amount)
-                if not inputs:
-                    return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
-                fee = select_utxo(utxos, 1, 1)
-                if not fee:
-                    return JsonResponse({'error': 'insufficient fee'}, status=httplib.BAD_REQUEST)
-                inputs += fee
+            inputs = select_utxo(utxos, amount + 1)
+            if not inputs:
+                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
 
             ins = [utxo_to_txin(utxo) for utxo in inputs]
-            outs = [{'address': to_address, 'value': int(amount * 10**8), 'color': color_id}]
+            outs = [{'address': to_address, 'value': int(amount * 10**8)}]
             # Now for the `change` part.
-            if color_id == 1:
-                inputs_value = balance_from_utxos(inputs)[color_id]
+                inputs_value = balance_from_utxos(inputs)
                 change = inputs_value - amount - 1
                 if change:
                     outs.append({'address': from_address,
-                                 'value': int(change * 10**8), 'color': color_id})
-            else:
-                inputs_value = balance_from_utxos(inputs)[color_id]
-                change = inputs_value - amount
-                if change:
-                    outs.append({'address': from_address,
-                                 'value': int(change * 10**8), 'color': color_id})
-                # Fee `change`.
-                fee_value = balance_from_utxos(inputs)[1]
-                fee_change = fee_value - 1
-                if fee_change:
-                    outs.append({'address': from_address,
-                                 'value': int(fee_change * 10**8), 'color': 1})
+                                 'value': int(change * 10**8))
 
             if op_return_data:
                 outs.append({
                     'script': mk_op_return_script(op_return_data.encode('utf8')),
                     'value': 0,
-                    'color': 0
                 })
                 raw_tx = make_raw_tx(ins, outs, 5)  # contract type
             else:
@@ -265,10 +227,10 @@ class GeneralTxView(CsrfExemptMixin, View):
         if len(json_obj['tx_info']) < 1:
             return '`tx_info` does not have any item'
 
-        tx_info_key_set = {'from_address', 'to_address', 'color_id', 'amount'}
+        tx_info_key_set = {'from_address', 'to_address', 'amount'}
         for tx_info in json_obj['tx_info']:
             if not tx_info_key_set <= set(tx_info.keys()):
-                return 'objects in `tx_info` should contain keys `from_address`, `to_address`, `color_id`, `amount`'
+                return 'objects in `tx_info` should contain keys `from_address`, `to_address`, `amount`'
             try:
                 address_validator(tx_info['from_address'])
             except ValidationError:
@@ -277,7 +239,6 @@ class GeneralTxView(CsrfExemptMixin, View):
                 address_validator(tx_info['to_address'])
             except ValidationError:
                 return 'invalid address {}'.format(tx_info['to_address'])
-            tx_info['color_id'] = int(tx_info['color_id'])
             tx_info['amount'] = Decimal(tx_info['amount'])
 
     @staticmethod
@@ -286,12 +247,9 @@ class GeneralTxView(CsrfExemptMixin, View):
 
         for tx_info in tx_info_list:
             from_address = tx_info['from_address']
-            color_id = tx_info['color_id']
 
             addr_in = tx_info_in.setdefault(from_address, {})
-            if color_id not in addr_in:
-                addr_in[color_id] = 0
-            addr_in[color_id] += tx_info['amount']
+            addr_in += tx_info['amount']
 
         return tx_info_in
 
@@ -301,12 +259,9 @@ class GeneralTxView(CsrfExemptMixin, View):
 
         for tx_info in tx_info_list:
             to_address = tx_info['to_address']
-            color_id = tx_info['color_id']
 
             addr_in = tx_info_out.setdefault(to_address, {})
-            if color_id not in addr_in:
-                addr_in[color_id] = 0
-            addr_in[color_id] += tx_info['amount']
+            addr_in += tx_info['amount']
 
         return tx_info_out
 
@@ -329,36 +284,34 @@ class GeneralTxView(CsrfExemptMixin, View):
         fee_included = False
         fee_address = json_obj['tx_info'][0]['from_address']
 
-        for from_address, color_amount_map in tx_info_ins.items():
+        for from_address, amount in tx_info_ins.items():
             utxos = get_rpc_connection().gettxoutaddress(from_address)
 
-            for color_id, amount in color_amount_map.items():
-                vins = select_utxo(utxos=utxos, color=color_id, sum=amount)
+            vins = select_utxo(utxos=utxos, sum=amount)
+            if not vins:
+                error_msg = 'insufficient amount in address {}'.format(from_address)
+                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+
+            change = balance_from_utxos(vins) - amount
+
+            if from_address == fee_address :
+                vins = select_utxo(utxos=utxos, sum=amount+1)
                 if not vins:
-                    error_msg = 'insufficient color {} in address {}'.format(color_id, from_address)
+                    error_msg = 'insufficient fee in address {}'.format(from_address)
                     return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+                fee_included = True
+                change = balance_from_utxos(vins) - (amount + 1)
 
-                change = balance_from_utxos(vins)[color_id] - amount
+            tx_vins += [utxo_to_txin(utxo) for utxo in vins]
 
-                if from_address == fee_address and color_id == 1:
-                    vins = select_utxo(utxos=utxos, color=color_id, sum=amount+1)
-                    if not vins:
-                        error_msg = 'insufficient fee in address {}'.format(from_address)
-                        return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
-                    fee_included = True
-                    change = balance_from_utxos(vins)[color_id] - (amount + 1)
-
-                tx_vins += [utxo_to_txin(utxo) for utxo in vins]
-
-                if change:
+            if change:
                     tx_vouts.append({'address': from_address,
-                                     'value': int(change * 10**8),
-                                     'color': color_id})
+                                     'value': int(change * 10**8)})
 
         if not fee_included:
             utxos = get_rpc_connection().gettxoutaddress(fee_address)
 
-            vins = select_utxo(utxos=utxos, color=1, sum=1)
+            vins = select_utxo(utxos=utxos, sum=1)
             if not vins:
                 error_msg = 'insufficient fee in address {}'.format(fee_address)
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
@@ -367,20 +320,16 @@ class GeneralTxView(CsrfExemptMixin, View):
             change = balance_from_utxos(vins)[1] - 1
             if change:
                 tx_vouts.append({'address': fee_address,
-                                 'value': int(change * 10**8),
-                                 'color': 1})
+                                 'value': int(change * 10**8)})
 
-        for to_address, color_amount_map in tx_info_outs.items():
-            for color_id, amount in color_amount_map.items():
-                tx_vouts.append({'address': to_address,
-                                 'value': int(amount * 10**8),
-                                 'color': color_id})
+        for to_address, amount in tx_info_outs.items():
+            tx_vouts.append({'address': to_address,
+                             'value': int(amount * 10**8)})
 
         if op_return_data:
             tx_vouts.append({
                 'script': mk_op_return_script(op_return_data.encode('utf8')),
-                'value': 0,
-                'color': 0
+                'value': 0
             })
 
             raw_tx = make_raw_tx(tx_vins, tx_vouts, TransactionType.to_number("CONTRACT"))
