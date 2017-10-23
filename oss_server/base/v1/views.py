@@ -18,8 +18,7 @@ from oss_server.types import TransactionType
 from oss_server.utils import address_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
-from .forms import (CreateLicenseRawTxForm, CreateLicenseTransferRawTxForm,
-                    CreateSmartContractRawTxForm, MintRawTxForm, RawTxForm)
+from .forms import (CreateSmartContractRawTxForm, RawTxForm)
 
 logger = logging.getLogger(__name__)
 
@@ -45,88 +44,6 @@ class CsrfExemptMixin(object):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
         return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
-
-
-class GetLicenseInfoView(View):
-
-    def get(self, request, color_id, *args, **kwargs):
-        try:
-            response = get_rpc_connection().getlicenseinfo(int(color_id))
-            # change some dictionary key names
-            response['total_amount'] = response.pop('Total amount')
-            response['owner'] = response.pop('Owner')
-            return JsonResponse(response)
-        except InvalidParameter:
-            response = {'error': 'license color not exist'}
-            return JsonResponse(response, status=httplib.NOT_FOUND)
-
-
-class CreateLicenseRawTxView(View):
-
-    def __init__(self):
-        super(CreateLicenseRawTxView, self).__init__()
-        self._conn = get_rpc_connection()
-
-    def get(self, request):
-        form = CreateLicenseRawTxForm(request.GET)
-        if form.is_valid():
-            color_id = form.cleaned_data['color_id']
-            to_address = form.cleaned_data['to_address']
-            alliance_member_address = form.cleaned_data['alliance_member_address']
-
-            if self._is_license_created(color_id):
-                return JsonResponse({'error': 'license with such color already exists'}, status=httplib.BAD_REQUEST)
-
-            color_0_utxo = self._find_color_0_utxo(alliance_member_address)
-            if not color_0_utxo:
-                return JsonResponse({'error': 'insufficient color 0 in alliance member address'}, status=httplib.BAD_REQUEST)
-
-            color_0_tx_ins = [utxo_to_txin(color_0_utxo)]
-
-            license_script = self._get_license_script(form.cleaned_data)
-            license_info_tx_outs = [
-                {'address': to_address, 'value': int(10**8), 'color': color_id},
-                {'script': license_script, 'value': 0, 'color': color_id}
-            ]
-
-            create_license_raw_tx = make_raw_tx(
-                color_0_tx_ins,
-                license_info_tx_outs,
-                TransactionType.to_number('LICENSE')
-            )
-
-            return JsonResponse({'raw_tx': create_license_raw_tx})
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-    def _is_license_created(self, color_id):
-        try:
-            self._conn.getlicenseinfo(int(color_id))
-            return True
-        except InvalidParameter:
-            return False
-
-    def _find_color_0_utxo(self, alliance_member_address):
-        utxos = self._conn.gettxoutaddress(alliance_member_address)
-        inputs = select_utxo(utxos=utxos, color=0, sum=1)
-        return inputs[0] if inputs else None
-
-    def _get_license_script(self, data):
-        license = {
-            'name': data['name'],
-            'description': data['description'],
-            'issuer': 'none',
-            'fee_collector': 'none',
-            'member_control': data['member_control'],
-            'metadata_link': data['metadata_link'],
-            'upper_limit': data['upper_limit'] or 0,
-        }
-
-        license_hex = encode_license(license)
-        return mk_op_return_script(license_hex)
-
 
 class CreateSmartContractRawTxView(CsrfExemptMixin, View):
     FEE_COLOR = 1
@@ -331,54 +248,6 @@ class GetBalanceView(View):
             utxos = get_rpc_connection().gettxoutaddress(address)
         balance_dict = balance_from_utxos(utxos)
         return JsonResponse(balance_dict)
-
-
-class CreateMintRawTxView(View):
-
-    def get(self, request, *args, **kwargs):
-        form = MintRawTxForm(request.GET)
-        if form.is_valid():
-            mint_pubkey = form.cleaned_data['mint_pubkey']
-            color_id = form.cleaned_data['color_id']
-            amount = form.cleaned_data['amount']
-
-            raw_tx = make_mint_raw_tx(mint_pubkey, color_id, int(amount * 10**8))
-            return JsonResponse({'raw_tx': raw_tx})
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-
-class CreateLicenseTransferRawTxView(View):
-
-    def get(self, request, *args, **kwargs):
-        form = CreateLicenseTransferRawTxForm(request.GET)
-        if form.is_valid():
-            from_address = form.cleaned_data['from_address']
-            to_address = form.cleaned_data['to_address']
-            color_id = form.cleaned_data['color_id']
-
-            utxos = get_rpc_connection().gettxoutaddress(from_address, True, 1)
-            utxo = self._get_license_utxo(utxos, color_id)
-            if not utxo:
-                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
-
-            ins = [utxo_to_txin(utxo)]
-            outs = [{'address': to_address, 'value': 100000000, 'color': color_id}]
-
-            raw_tx = make_raw_tx(ins, outs, TransactionType.to_number('LICENSE'))
-            return JsonResponse({'raw_tx': raw_tx})
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-    def _get_license_utxo(self, utxos, color):
-        for utxo in utxos:
-            if utxo['color'] == color:
-                return utxo
-        return None
 
 
 class UtxoView(View):
