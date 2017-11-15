@@ -185,8 +185,8 @@ class GetBalanceView(View):
             utxos = get_rpc_connection().gettxoutaddress(address, mempool=False)
         else:
             utxos = get_rpc_connection().gettxoutaddress(address)
-        balance_dict = balance_from_utxos(utxos)
-        return JsonResponse(balance_dict)
+        balance = balance_from_utxos(utxos)
+        return JsonResponse({'balance': balance})
 
 
 class UtxoView(View):
