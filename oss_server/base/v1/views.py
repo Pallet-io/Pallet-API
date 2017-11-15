@@ -142,11 +142,11 @@ class CreateRawTxView(View):
             ins = [utxo_to_txin(utxo) for utxo in inputs]
             outs = [{'address': to_address, 'value': int(amount * 10**8)}]
             # Now for the `change` part.
-                inputs_value = balance_from_utxos(inputs)
-                change = inputs_value - amount - 1
-                if change:
-                    outs.append({'address': from_address,
-                                 'value': int(change * 10**8))
+            inputs_value = balance_from_utxos(inputs)
+            change = inputs_value - amount - 1
+            if change:
+                outs.append({'address': from_address,
+                             'value': int(change * 10**8)})
 
             if op_return_data:
                 outs.append({
