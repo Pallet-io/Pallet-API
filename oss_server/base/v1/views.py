@@ -225,7 +225,7 @@ class GeneralTxView(CsrfExemptMixin, View):
         for tx_info in tx_info_list:
             from_address = tx_info['from_address']
 
-            addr_in = tx_info_in.setdefault(from_address, {})
+            addr_in = tx_info_in.setdefault(from_address, 0)
             addr_in += tx_info['amount']
 
         return tx_info_in
@@ -237,7 +237,7 @@ class GeneralTxView(CsrfExemptMixin, View):
         for tx_info in tx_info_list:
             to_address = tx_info['to_address']
 
-            addr_in = tx_info_out.setdefault(to_address, {})
+            addr_in = tx_info_out.setdefault(to_address, 0)
             addr_in += tx_info['amount']
 
         return tx_info_out
