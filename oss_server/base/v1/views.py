@@ -76,13 +76,12 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
                     'address': to_address,
                     'value': int(amount * (10**8)),
                 })
-                change = balance_from_utxos(inputs) - amount
+                change = balance_from_utxos(inputs) - amount - total_fee
                 if change:
                     outs.append({
                         'address': from_address,
                         'value': int(change * (10**8)),
                     })
-            outs += self._build_txouts(from_address, to_address, code, contract_fee)
 
             raw_tx = make_raw_tx(ins, outs, TransactionType.to_number('CONTRACT'))
             return JsonResponse({'raw_tx': raw_tx})
@@ -90,28 +89,6 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-    def _build_txouts(self, from_address, to_address, code, contract_fee, utxo_inputs):
-        outs = [
-            {
-                'address': to_address,
-                'value': int(contract_fee * (10**8)),
-            },
-            {
-                'script': mk_op_return_script(code),
-                'value': 0,
-            }
-        ]
-
-        change = balance_from_utxos(utxo_inputs) - contract_fee - self.TX_FEE
-        if change:
-            outs.append({
-                'address': from_address,
-                'value': int(change * (10**8)),
-            })
-
-        return outs
-
 
 class GetRawTxView(View):
 
