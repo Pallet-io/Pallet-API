@@ -7,8 +7,6 @@ from django.db import models
 
 from gcoin import decode_op_return_script
 
-from oss_server.types import TransactionType
-
 
 class Address(models.Model):
     address = models.CharField(unique=True, max_length=40)
@@ -105,7 +103,6 @@ class Tx(models.Model):
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
-    type = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     size = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True, db_index=True)
 
@@ -115,7 +112,6 @@ class Tx(models.Model):
             ('blockhash', self.block.hash),
             ('version', int(self.version)),
             ('locktime', int(self.locktime)),
-            ('type', TransactionType.to_type(int(self.type))),
             ('time', int(self.time)),
             ('confirmations', self.block.confirmation),
             ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
@@ -133,7 +129,6 @@ class TxOut(models.Model):
     scriptpubkey = models.BinaryField(blank=True, null=True)
     address = models.ForeignKey(Address, related_name='tx_outs', related_query_name='tx_out')
     spent = models.DecimalField(max_digits=1, decimal_places=0, default=0)
-    color = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
 
     @property
     def is_op_return(self):
@@ -145,7 +140,6 @@ class TxOut(models.Model):
             ('n', int(self.position)),
             ('address', self.address.address),
             ('scriptPubKey', binascii.hexlify(self.scriptpubkey)),
-            ('color', int(self.color)),
             ('amount', int(self.value)),
         ])
 
@@ -153,7 +147,6 @@ class TxOut(models.Model):
         return OrderedDict([
             ('tx_hash', self.tx.hash),
             ('n', int(self.position)),
-            ('color', int(self.color)),
             ('amount', int(self.value))
         ])
 
@@ -176,7 +169,6 @@ class TxIn(models.Model):
             ('tx_hash', self.txout.tx.hash if self.txout else None),
             ('vout', int(self.txout.position) if self.txout else 0),
             ('address', self.txout.address.address if self.txout else None),
-            ('color', int(self.txout.color) if self.txout else None),
             ('amount', int(self.txout.value) if self.txout else None),
             ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
