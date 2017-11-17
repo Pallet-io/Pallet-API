@@ -21,7 +21,7 @@ class DatadirAdmin(admin.ModelAdmin):
 
 @admin.register(Tx)
 class TxAdmin(admin.ModelAdmin):
-    list_display = ('hash', 'block', 'type')
+    list_display = ('hash', 'block')
     search_fields = ('hash',)
 
 

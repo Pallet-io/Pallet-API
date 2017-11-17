@@ -182,7 +182,6 @@ class BlockDBUpdater(object):
             block=block_db,
             version=tx.version,
             locktime=tx.lockTime,
-            type=tx.txType,
             size=tx.size,
             time=block_db.time
         )
@@ -221,8 +220,7 @@ class BlockDBUpdater(object):
               value=txout.value,
               position=position,
               scriptpubkey=txout.pubkey,
-              address=Address.objects.get_or_create(address=txout.address)[0],
-              color=txout.color
+              address=Address.objects.get_or_create(address=txout.address)[0]
               ).save()
 
     def _get_or_create_datadir(self):
