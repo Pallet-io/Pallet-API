@@ -110,7 +110,6 @@ class GetAddressTxsView(View):
         form = GetAddressTxsForm(request.GET)
         if form.is_valid():
             starting_after = form.cleaned_data['starting_after']
-            tx_type = form.cleaned_data['tx_type']
             since = form.cleaned_data['since']
             until = form.cleaned_data['until']
             page_size = form.cleaned_data['page_size'] or 50
@@ -119,9 +118,6 @@ class GetAddressTxsView(View):
             Q1 = Q(tx_in__txout__address__address=address)
             Q2 = Q(tx_out__address__address=address)
             tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
-
-            if tx_type is not None:
-                tx_list = tx_list.filter(type=tx_type)
 
             if since is not None:
                 tx_list = tx_list.filter(time__gte=since)
@@ -155,29 +151,20 @@ class GetAddressTxsView(View):
 
 class GetAddressBalanceView(View):
     def get(self, request, address):
-        normal_type = Q(tx__type=0)
-        mint_type = Q(tx__type=1)
-        contract_type = Q(tx__type=5)
-        utxo_list = TxOut.objects.filter(normal_type | mint_type | contract_type,
-                                         tx__block__in_longest=1,
+        utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
                                          spent=0)
 
-        response = {}
+        balance = 0;
         for utxo in utxo_list:
-            color = int(utxo.color)
             value = utxo.value
-            response[color] = response.get(color, 0) + value
-        return JsonResponse(response)
+            balance += value
+        return JsonResponse({'balance' : balance})
 
 
 class GetAddressUtxoView(View):
     def get(self, request, address):
-        normal_type = Q(tx__type=0)
-        mint_type = Q(tx__type=1)
-        contract_type = Q(tx__type=5)
-        utxo_list = TxOut.objects.filter(normal_type | mint_type | contract_type,
-                                         tx__block__in_longest=1,
+        utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
                                          spent=0)
 
@@ -188,7 +175,7 @@ class GetAddressUtxoView(View):
 class GetAddressOpReturnView(View):
     def get(self, request, address):
         # choose all tx outs if other tx outs in the same tx are related to this address
-        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address, tx__type=5)
+        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address)
         op_return_out = [out.op_return_dict() for out in tx_out_list if out.is_op_return]
 
         response = {'txout': op_return_out}
