@@ -24,7 +24,6 @@ def select_utxo(utxos, sum):
     if not utxos:
         return []
 
-    utxos = [utxo for utxo in utxos]
     utxos = sorted(utxos, key=lambda utxo: utxo['value'])
 
     value = 0
@@ -52,9 +51,7 @@ def balance_from_utxos(utxos):
     """
     balance = 0
     if utxos:
-        for utxo in utxos:
-            value = utxo['value']
-            balance = balance + value
+        balance = sum(utxo['value'] for utxo in utxos)
     return balance
 
 

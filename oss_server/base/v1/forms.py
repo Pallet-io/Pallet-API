@@ -30,10 +30,6 @@ class CreateSmartContractRawTxForm(forms.Form):
                                           'max_value': '`contract_fee` should be less than or equal to %(limit_value)s'
                                       })
 
-    def clean(self):
-        cleaned_data = super(CreateSmartContractRawTxForm, self).clean()
-        amount = cleaned_data.get('amount')
-
 
 class RawTxForm(forms.Form):
     from_address = AddressField(error_messages={
