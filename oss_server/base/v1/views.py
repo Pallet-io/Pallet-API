@@ -14,7 +14,6 @@ from gcoin import (encode_license, make_mint_raw_tx, make_raw_tx,
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from oss_server.types import TransactionType
 from oss_server.utils import address_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
@@ -83,7 +82,7 @@ class CreateSmartContractRawTxView(CsrfExemptMixin, View):
                         'value': int(change * (10**8)),
                     })
 
-            raw_tx = make_raw_tx(ins, outs, TransactionType.to_number('CONTRACT'))
+            raw_tx = make_raw_tx(ins, outs)
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
@@ -153,7 +152,7 @@ class CreateRawTxView(View):
                     'script': mk_op_return_script(op_return_data.encode('utf8')),
                     'value': 0,
                 })
-                raw_tx = make_raw_tx(ins, outs, 5)  # contract type
+                raw_tx = make_raw_tx(ins, outs)
             else:
                 raw_tx = make_raw_tx(ins, outs)
 
@@ -309,7 +308,7 @@ class GeneralTxView(CsrfExemptMixin, View):
                 'value': 0
             })
 
-            raw_tx = make_raw_tx(tx_vins, tx_vouts, TransactionType.to_number("CONTRACT"))
+            raw_tx = make_raw_tx(tx_vins, tx_vouts)
         else:
             raw_tx = make_raw_tx(tx_vins, tx_vouts)
 
