@@ -4,7 +4,7 @@ from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.views.generic import View
 
-from .forms import GetAddressTxsForm, GetBlocksForm, GetColorTxsForm
+from .forms import GetAddressTxsForm, GetBlocksForm
 from ..models import *
 from ..pagination import *
 
@@ -103,50 +103,6 @@ class GetTxByHashView(View):
         except Tx.DoesNotExist:
             response = {'error': 'tx not exist'}
             return JsonResponse(response, status=httplib.NOT_FOUND)
-
-
-class GetColorTxsView(View):
-    def get(self, request, color_id):
-        form = GetColorTxsForm(request.GET)
-        if form.is_valid():
-            starting_after = form.cleaned_data['starting_after']
-            since = form.cleaned_data['since']
-            until = form.cleaned_data['until']
-            page_size = form.cleaned_data['page_size'] or 50
-
-            # tx should be NORMAL / MINT type and in main chain, and distinct() prevents duplicate object
-            Q1 = Q(tx_in__txout__color=color_id)
-            Q2 = Q(tx_out__color=color_id)
-            tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
-
-            if since is not None:
-                tx_list = tx_list.filter(time__gte=since)
-
-            if until is not None:
-                tx_list = tx_list.filter(time__lt=until)
-
-            try:
-                start_tx = Tx.objects.get(hash=starting_after) if starting_after else None
-            except Tx.DoesNotExist:
-                response = {'error': 'tx not exist'}
-                return JsonResponse(response, status=httplib.NOT_FOUND)
-
-            page, txs = object_pagination(tx_list, start_tx, page_size)
-
-            if len(txs) > 0 and txs.has_next():
-                query_dict = request.GET.copy()
-                query_dict['starting_after'] = txs[-1].hash
-                page['next_uri'] = '/explorer/v1/transactions/color/' + color_id + '?' + query_dict.urlencode()
-
-            response = {
-                'page': page,
-                'txs': [tx.as_dict() for tx in txs]
-            }
-            return JsonResponse(response)
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
 
 
 class GetAddressTxsView(View):
