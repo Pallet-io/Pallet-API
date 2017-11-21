@@ -9,8 +9,7 @@ from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
-from gcoin import (encode_license, make_mint_raw_tx, make_raw_tx,
-                   mk_op_return_script)
+from gcoin import (make_raw_tx, mk_op_return_script)
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
