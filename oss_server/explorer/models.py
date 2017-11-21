@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from decimal import Decimal
 
 import binascii
 from collections import OrderedDict
@@ -157,6 +158,13 @@ class TxOut(models.Model):
             ('op_return_data', decode_op_return_script(binascii.hexlify(self.scriptpubkey))),
         ])
 
+    def utxo_as_vin_dict(self):
+        return OrderedDict([
+            ('txid', self.tx.hash),
+            ('vout', int(self.position)),
+            ('value', Decimal(self.value / 100000000)),
+            ('scriptPubKey', binascii.hexlify(self.scriptpubkey))
+        ])
 
 class TxIn(models.Model):
     tx = models.ForeignKey(Tx, related_name='tx_ins', related_query_name='tx_in')
