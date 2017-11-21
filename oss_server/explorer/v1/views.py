@@ -15,6 +15,7 @@ from .forms import GetAddressTxsForm, GetBlocksForm
 from ..models import *
 from ..pagination import *
 from base.utils import balance_from_utxos, select_utxo, utxo_to_txin
+from base.v1.forms import RawTxForm
 
 
 class GetBlocksView(View):
@@ -323,3 +324,46 @@ class GeneralTxView(CsrfExemptMixin, View):
             raw_tx = make_raw_tx(tx_vins, tx_vouts)
 
         return JsonResponse({'raw_tx': raw_tx})
+
+
+class CreateRawTxView(View):
+
+    def get(self, request, *args, **kwargs):
+        form = RawTxForm(request.GET)
+        if form.is_valid():
+            from_address = form.cleaned_data['from_address']
+            to_address = form.cleaned_data['to_address']
+            amount = form.cleaned_data['amount']
+            op_return_data = form.cleaned_data['op_return_data']
+
+            utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
+                                             address__address=from_address,
+                                             spent=0)
+            utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
+            inputs = select_utxo(utxos, amount + 1)
+            if not inputs:
+                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+
+            ins = [utxo_to_txin(utxo) for utxo in inputs]
+            outs = [{'address': to_address, 'value': int(amount * 10**8)}]
+            # Now for the `change` part.
+            inputs_value = balance_from_utxos(inputs)
+            change = inputs_value - amount - 1
+            if change:
+                outs.append({'address': from_address,
+                             'value': int(change * 10**8)})
+
+            if op_return_data:
+                outs.append({
+                    'script': mk_op_return_script(op_return_data.encode('utf8')),
+                    'value': 0,
+                })
+                raw_tx = make_raw_tx(ins, outs)
+            else:
+                raw_tx = make_raw_tx(ins, outs)
+
+            return JsonResponse({'raw_tx': raw_tx})
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
