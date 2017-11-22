@@ -84,59 +84,6 @@ class GetRawTxTest(TestCase):
         self.assertEqual(response.status_code, httplib.NOT_FOUND)
 
 
-class CreateSmartContractRawTxTest(TestCase):
-
-    def setUp(self):
-        self.url = '/base/v1/smartcontract/prepare'
-        self.sample_txoutaddress = [
-            {
-                'txid': 'bb0db93977be1075afd6f17f865f1fc8e015e0d3c80e91bd562c7cfcad127353',
-                'vout': 0,
-                'color': 1,
-                'value': 10000,
-                'scriptPubKey': '76a9141e92d02be0d956de3c32706899dec031830e3a4188ac'
-            },
-        ]
-        self.sample_params = {
-            'from_address': '13nf9WjwBWY5LY8yxVfmuDPtpowNgPTqNW',
-            'to_address': '3FUvnrSFBwUwGKDHN7wuxe3A1yfPkiHUXP',
-            'code': 'this is code.........',
-            'contract_fee': 1,
-        }
-
-    @mock.patch('base.v1.views.get_rpc_connection')
-    def test_create_tx(self, mock_rpc):
-        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
-        response = self.client.post(self.url, self.sample_params)
-        self.assertEqual(response.status_code, httplib.OK)
-        self.assertIn('raw_tx', response.json())
-
-    def test_miss_field_form(self):
-        required_field = ['from_address', 'to_address', 'code']
-        for field in required_field:
-            miss_field_params = dict(self.sample_params)
-            del miss_field_params[field]
-            response = self.client.post(self.url, miss_field_params)
-            self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-
-    @mock.patch('base.v1.views.get_rpc_connection')
-    def test_balance_not_enough(self, mock_rpc):
-        mock_rpc().gettxoutaddress.return_value = None
-
-        response = self.client.post(self.url, self.sample_params)
-        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-
-    def test_missing_color_id(self):
-        self.sample_params['amount'] = 9487
-        response = self.client.post(self.url, self.sample_params)
-        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-
-    def test_missing_amount(self):
-        self.sample_params['color_id'] = 9487
-        response = self.client.post(self.url, self.sample_params)
-        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-
-
 class GetBalanceTest(TestCase):
 
     def setUp(self):

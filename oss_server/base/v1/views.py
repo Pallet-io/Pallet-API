@@ -16,7 +16,7 @@ from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 from oss_server.utils import address_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
-from .forms import (CreateSmartContractRawTxForm, RawTxForm)
+from .forms import RawTxForm
 
 logger = logging.getLogger(__name__)
 
@@ -43,50 +43,6 @@ class CsrfExemptMixin(object):
     def dispatch(self, *args, **kwargs):
         return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
 
-class CreateSmartContractRawTxView(CsrfExemptMixin, View):
-    TX_FEE = 1
-    DEFAULT_CONTRACT_FEE = 1
-
-    def post(self, request, *args, **kwargs):
-        form = CreateSmartContractRawTxForm(request.POST)
-        if form.is_valid():
-            from_address = form.cleaned_data['from_address']
-            to_address = form.cleaned_data['to_address']
-            amount = form.cleaned_data['amount']
-            code = form.cleaned_data['code']
-            contract_fee = form.cleaned_data['contract_fee'] or self.DEFAULT_CONTRACT_FEE
-
-            utxos = get_rpc_connection().gettxoutaddress(from_address)
-            total_fee = contract_fee + self.TX_FEE
-
-            if amount:
-                inputs = select_utxo(utxos=utxos, sum= (amount + total_fee))
-                if not inputs:
-                    return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
-            else:
-                inputs = []
-
-            ins = [utxo_to_txin(utxo) for utxo in inputs]
-
-            outs = []
-            if amount:
-                outs.append({
-                    'address': to_address,
-                    'value': int(amount * (10**8)),
-                })
-                change = balance_from_utxos(inputs) - amount - total_fee
-                if change:
-                    outs.append({
-                        'address': from_address,
-                        'value': int(change * (10**8)),
-                    })
-
-            raw_tx = make_raw_tx(ins, outs)
-            return JsonResponse({'raw_tx': raw_tx})
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
 
 class GetRawTxView(View):
 
