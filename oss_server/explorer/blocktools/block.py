@@ -4,7 +4,7 @@ from blocktools import *
 from gcoin.transaction import serialize
 
 
-GC30 = 2509744043
+MAGIC = 3652501241
 SKIP_LIMIT = 100
 
 class BlockHeader:
@@ -72,8 +72,7 @@ class Block:
         skip_bytes = 0
         while self.hasLength(blockchain, 8) and skip_bytes < SKIP_LIMIT:
             self.magicNum = uint4(blockchain)
-
-            if self.magicNum == GC30:
+            if self.magicNum == MAGIC:
                 # this is normal situation
                 self.blocksize = uint4(blockchain)
                 break
@@ -97,9 +96,6 @@ class Block:
             for i in range(0, self.txCount):
                 tx = Tx(blockchain)
                 self.Txs.append(tx)
-
-            self.scriptLen = varint(blockchain)
-            self.scriptSig = blockchain.read(self.scriptLen)
         else:
             self.continueParsing = False
 
@@ -156,7 +152,6 @@ class Tx:
                 output = txOutput(blockchain)
                 self.outputs.append(output)
         self.lockTime = uint4(blockchain)
-        self.txType = uint4(blockchain)
         self.size = blockchain.tell() - txStart
 
     @property
@@ -183,13 +178,12 @@ class Tx:
         for o in self.outputs:
             o.toString()
         print "Lock Time:\t %d" % self.lockTime
-        print "TX TYPE:\t %d" % self.txType
         print "TX Size:\t %d" % self.size
 
     def toDict(self):
         txDict = {
             'locktime': self.lockTime, 'version': self.version,
-            'ins': [], 'outs': [], 'type': self.txType
+            'ins': [], 'outs': []
         }
 
         for txin in self.inputs:
@@ -236,7 +230,6 @@ class txOutput:
         self.value = uint8(blockchain)
         self.scriptLen = varint(blockchain)
         self.pubkey = blockchain.read(self.scriptLen)
-        self.color = uint4(blockchain)
 
     @property
     def address(self):
@@ -247,14 +240,12 @@ class txOutput:
         print "Value:\t\t %d" % self.value
         print "Script Len:\t %d" % self.scriptLen
         print "Pubkey:\t\t %s" % hashStr(self.pubkey)
-        print "Color:\t\t %d" % self.color
         print "Addr:\t\t %s" % self.address
         print "---------------------------------------------"
 
     def toDict(self):
         dict_ = {
             'script': hashStr(self.pubkey),
-            'value': self.value,
-            'color': self.color
+            'value': self.value
         }
         return dict_

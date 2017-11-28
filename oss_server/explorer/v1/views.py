@@ -1,10 +1,20 @@
+from decimal import Decimal
 import httplib
+import json
 
 from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.views.generic import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.core.exceptions import ValidationError
+from gcoin import make_raw_tx, mk_op_return_script
 
-from .forms import GetAddressTxsForm, GetBlocksForm, GetColorTxsForm
+from oss_server.utils import address_validator
+from base.utils import balance_from_utxos, select_utxo, utxo_to_txin
+from base.v1.forms import RawTxForm
+
+from .forms import GetAddressTxsForm, GetBlocksForm
 from ..models import *
 from ..pagination import *
 
@@ -105,56 +115,11 @@ class GetTxByHashView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetColorTxsView(View):
-    def get(self, request, color_id):
-        form = GetColorTxsForm(request.GET)
-        if form.is_valid():
-            starting_after = form.cleaned_data['starting_after']
-            since = form.cleaned_data['since']
-            until = form.cleaned_data['until']
-            page_size = form.cleaned_data['page_size'] or 50
-
-            # tx should be NORMAL / MINT type and in main chain, and distinct() prevents duplicate object
-            Q1 = Q(tx_in__txout__color=color_id)
-            Q2 = Q(tx_out__color=color_id)
-            tx_list = Tx.objects.filter(Q1 | Q2, type__lte=1, block__in_longest=1).distinct()
-
-            if since is not None:
-                tx_list = tx_list.filter(time__gte=since)
-
-            if until is not None:
-                tx_list = tx_list.filter(time__lt=until)
-
-            try:
-                start_tx = Tx.objects.get(hash=starting_after) if starting_after else None
-            except Tx.DoesNotExist:
-                response = {'error': 'tx not exist'}
-                return JsonResponse(response, status=httplib.NOT_FOUND)
-
-            page, txs = object_pagination(tx_list, start_tx, page_size)
-
-            if len(txs) > 0 and txs.has_next():
-                query_dict = request.GET.copy()
-                query_dict['starting_after'] = txs[-1].hash
-                page['next_uri'] = '/explorer/v1/transactions/color/' + color_id + '?' + query_dict.urlencode()
-
-            response = {
-                'page': page,
-                'txs': [tx.as_dict() for tx in txs]
-            }
-            return JsonResponse(response)
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-
 class GetAddressTxsView(View):
     def get(self, request, address):
         form = GetAddressTxsForm(request.GET)
         if form.is_valid():
             starting_after = form.cleaned_data['starting_after']
-            tx_type = form.cleaned_data['tx_type']
             since = form.cleaned_data['since']
             until = form.cleaned_data['until']
             page_size = form.cleaned_data['page_size'] or 50
@@ -163,9 +128,6 @@ class GetAddressTxsView(View):
             Q1 = Q(tx_in__txout__address__address=address)
             Q2 = Q(tx_out__address__address=address)
             tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1).distinct()
-
-            if tx_type is not None:
-                tx_list = tx_list.filter(type=tx_type)
 
             if since is not None:
                 tx_list = tx_list.filter(time__gte=since)
@@ -199,29 +161,20 @@ class GetAddressTxsView(View):
 
 class GetAddressBalanceView(View):
     def get(self, request, address):
-        normal_type = Q(tx__type=0)
-        mint_type = Q(tx__type=1)
-        contract_type = Q(tx__type=5)
-        utxo_list = TxOut.objects.filter(normal_type | mint_type | contract_type,
-                                         tx__block__in_longest=1,
+        utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
                                          spent=0)
 
-        response = {}
+        balance = 0
         for utxo in utxo_list:
-            color = int(utxo.color)
             value = utxo.value
-            response[color] = response.get(color, 0) + value
-        return JsonResponse(response)
+            balance += value
+        return JsonResponse({'balance' : balance})
 
 
 class GetAddressUtxoView(View):
     def get(self, request, address):
-        normal_type = Q(tx__type=0)
-        mint_type = Q(tx__type=1)
-        contract_type = Q(tx__type=5)
-        utxo_list = TxOut.objects.filter(normal_type | mint_type | contract_type,
-                                         tx__block__in_longest=1,
+        utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
                                          spent=0)
 
@@ -232,8 +185,186 @@ class GetAddressUtxoView(View):
 class GetAddressOpReturnView(View):
     def get(self, request, address):
         # choose all tx outs if other tx outs in the same tx are related to this address
-        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address, tx__type=5)
+        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address)
         op_return_out = [out.op_return_dict() for out in tx_out_list if out.is_op_return]
 
         response = {'txout': op_return_out}
         return JsonResponse(response)
+
+
+class CsrfExemptMixin(object):
+    """
+    Exempts the view from CSRF requirements.
+
+    This should be the left-most mixin of a view.
+    """
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
+
+
+class GeneralTxView(CsrfExemptMixin, View):
+    http_method_names = ['post']
+
+    @staticmethod
+    def _validate_json_obj(json_obj):
+        if len(json_obj['tx_info']) < 1:
+            return '`tx_info` does not have any item'
+
+        tx_info_key_set = {'from_address', 'to_address', 'amount'}
+        for tx_info in json_obj['tx_info']:
+            if not tx_info_key_set <= set(tx_info.keys()):
+                return 'objects in `tx_info` should contain keys `from_address`, `to_address`, `amount`'
+            try:
+                address_validator(tx_info['from_address'])
+            except ValidationError:
+                return 'invalid address {}'.format(tx_info['from_address'])
+            try:
+                address_validator(tx_info['to_address'])
+            except ValidationError:
+                return 'invalid address {}'.format(tx_info['to_address'])
+            tx_info['amount'] = Decimal(tx_info['amount'])
+
+    @staticmethod
+    def _aggregate_inputs(tx_info_list):
+        tx_info_in = {}
+
+        for tx_info in tx_info_list:
+            from_address = tx_info['from_address']
+
+            addr_in = tx_info_in.setdefault(from_address, 0)
+            tx_info_in[from_address] += tx_info['amount']
+
+        return tx_info_in
+
+    @staticmethod
+    def _aggregate_outputs(tx_info_list):
+        tx_info_out = {}
+
+        for tx_info in tx_info_list:
+            to_address = tx_info['to_address']
+
+            addr_in = tx_info_out.setdefault(to_address, 0)
+            tx_info_out[to_address] += tx_info['amount']
+
+        return tx_info_out
+
+    def post(self, request, *args, **kwargs):
+        try:
+            json_obj = json.loads(request.body)
+            error_msg = self._validate_json_obj(json_obj)
+        except:
+            return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
+        else:
+            if error_msg:
+                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+
+        op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
+        tx_info_ins = self._aggregate_inputs(json_obj['tx_info'])
+        tx_info_outs = self._aggregate_outputs(json_obj['tx_info'])
+
+        tx_vins = []
+        tx_vouts = []
+        fee_included = False
+        fee_address = json_obj['tx_info'][0]['from_address']
+
+        for from_address, amount in tx_info_ins.items():
+            utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
+                                             address__address=from_address,
+                                             spent=0)
+            utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
+            vins = select_utxo(utxos=utxos, sum=amount)
+            if not vins:
+                error_msg = 'insufficient amount in address {}'.format(from_address)
+                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+
+            change = balance_from_utxos(vins) - amount
+
+            if from_address == fee_address :
+                vins = select_utxo(utxos=utxos, sum=amount+1)
+                if not vins:
+                    error_msg = 'insufficient fee in address {}'.format(from_address)
+                    return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+                fee_included = True
+                change = balance_from_utxos(vins) - (amount + 1)
+
+            tx_vins += [utxo_to_txin(utxo) for utxo in vins]
+
+            if change:
+                    tx_vouts.append({'address': from_address,
+                                     'value': int(change * 10**8)})
+
+        if not fee_included:
+            utxos = TxOut.objects.filter(tx__block__in_longest=1,
+                                         address__address=fee_address,
+                                         spent=0)
+            utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
+            vins = select_utxo(utxos=utxos, sum=amount)
+            if not vins:
+                error_msg = 'insufficient fee in address {}'.format(fee_address)
+                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+            tx_vins += [utxo_to_txin(utxo) for utxo in vins]
+
+            change = balance_from_utxos(vins)[1] - 1
+            if change:
+                tx_vouts.append({'address': fee_address,
+                                 'value': int(change * 10**8)})
+
+        for to_address, amount in tx_info_outs.items():
+            tx_vouts.append({'address': to_address,
+                             'value': int(amount * 10**8)})
+
+        if op_return_data:
+            tx_vouts.append({
+                'script': mk_op_return_script(op_return_data.encode('utf8')),
+                'value': 0
+            })
+
+            raw_tx = make_raw_tx(tx_vins, tx_vouts)
+        else:
+            raw_tx = make_raw_tx(tx_vins, tx_vouts)
+
+        return JsonResponse({'raw_tx': raw_tx})
+
+
+class CreateRawTxView(View):
+
+    def get(self, request, *args, **kwargs):
+        form = RawTxForm(request.GET)
+        if form.is_valid():
+            from_address = form.cleaned_data['from_address']
+            to_address = form.cleaned_data['to_address']
+            amount = form.cleaned_data['amount']
+            op_return_data = form.cleaned_data['op_return_data']
+
+            utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
+                                             address__address=from_address,
+                                             spent=0)
+            utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
+            inputs = select_utxo(utxos, amount + 1)
+            if not inputs:
+                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+
+            ins = [utxo_to_txin(utxo) for utxo in inputs]
+            outs = [{'address': to_address, 'value': int(amount * 10**8)}]
+            # Now for the `change` part.
+            inputs_value = balance_from_utxos(inputs)
+            change = inputs_value - amount - 1
+            if change:
+                outs.append({'address': from_address,
+                             'value': int(change * 10**8)})
+
+            if op_return_data:
+                outs.append({
+                    'script': mk_op_return_script(op_return_data.encode('utf8')),
+                    'value': 0,
+                })
+                raw_tx = make_raw_tx(ins, outs)
+            else:
+                raw_tx = make_raw_tx(ins, outs)
+
+            return JsonResponse({'raw_tx': raw_tx})
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
