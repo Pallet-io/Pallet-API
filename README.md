@@ -1,5 +1,5 @@
-# OSS
-A REST api for gcoin rpc.
+# Pallium API
+A REST api for bitcoin rpc.
 
 ## Installation
 ### Requirement
@@ -46,16 +46,16 @@ Replacing it with `*` means it allowed requests from everywhere.
 
 Use `*` for develop and subdomain format for production environment.
 
-#### Gcoin rpc
+#### Bitcoin rpc
 
-Set up connection of gcoin rpc
+Set up connection of bitcoin rpc
 
 ```
-GCOIN_RPC = {
-    'user': '<GCOIN_RPC_USER>',
-    'password': '<GCOIN_RPC_PASSWORD>',
-    'host': '<GCOIN_RPC_HOST>',
-    'port': '<GCOIN_RPC_PORT>',
+BITCOIN_RPC = {
+    'user': '<BITCOIN_RPC_USER>',
+    'password': '<BITCOIN_RPC_PASSWORD>',
+    'host': '<BITCOIN_RPC_HOST>',
+    'port': '<BITCOIN_RPC_PORT>',
 }
 ```
 #### Database
@@ -81,7 +81,7 @@ DATABASES = {
 
 `<BLK_DIR>`
 
-The data forlder, which are usually located under `~/.gcoin/main/blocks`
+The data forlder, which are usually located under `~/.bitcoin/blocks`
 
 It is the key point for entire OSS project. The Django command called `blockupdate` will read all the blockchain data under this forlder every second by default and save these data to specified database.
 
