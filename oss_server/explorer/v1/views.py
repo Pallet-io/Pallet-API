@@ -8,14 +8,15 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
-
 from gcoin import make_raw_tx, mk_op_return_script
+
 from oss_server.utils import address_validator
+from base.utils import balance_from_utxos, select_utxo, utxo_to_txin
+from base.v1.forms import RawTxForm
+
 from .forms import GetAddressTxsForm, GetBlocksForm
 from ..models import *
 from ..pagination import *
-from base.utils import balance_from_utxos, select_utxo, utxo_to_txin
-from base.v1.forms import RawTxForm
 
 
 class GetBlocksView(View):
@@ -164,7 +165,7 @@ class GetAddressBalanceView(View):
                                          address__address=address,
                                          spent=0)
 
-        balance = 0;
+        balance = 0
         for utxo in utxo_list:
             value = utxo.value
             balance += value
