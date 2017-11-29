@@ -11,13 +11,13 @@ SERVER_CONFIG_ENV = 'oss_server.settings.' + '<ENV>'
 
 ALLOWED_HOSTS = ['<ALLOW_DOMAIN>']
 
-# Gcoin RPC
+# Bitcoin RPC
 
-GCOIN_RPC = {
-    'user': '<GCOIN_RPC_USER>',
-    'password': '<GCOIN_RPC_PASSWORD>',
-    'host': '<GCOIN_RPC_HOST>',
-    'port': '<GCOIN_RPC_PORT>',
+BITCOIN_RPC = {
+    'user': '<BITCOIN_RPC_USER>',
+    'password': '<BITCOIN_RPC_PASSWORD>',
+    'host': '<BITCOIN_RPC_HOST>',
+    'port': '<BITCOIN_RPC_PORT>',
 }
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -40,5 +40,5 @@ DATABASES = {
     }
 }
 
-# Absolute path to Gcoin blockchain data.
+# Absolute path to Bitcoin blockchain data.
 BLK_DIR = '<BLK_DIR>'
