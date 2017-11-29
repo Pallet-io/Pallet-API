@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 def get_rpc_connection():
-    return connect_to_remote(settings.GCOIN_RPC['user'],
-                             settings.GCOIN_RPC['password'],
-                             settings.GCOIN_RPC['host'],
-                             settings.GCOIN_RPC['port'])
+    return connect_to_remote(settings.BITCOIN_RPC['user'],
+                             settings.BITCOIN_RPC['password'],
+                             settings.BITCOIN_RPC['host'],
+                             settings.BITCOIN_RPC['port'])
 
 
 def server_error(request):

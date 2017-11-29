@@ -26,12 +26,12 @@ def close_connection():
     connection.close()
 
 def get_rpc_connection():
-    return connect_to_remote(settings.GCOIN_RPC['user'],
-                             settings.GCOIN_RPC['password'],
-                             settings.GCOIN_RPC['host'],
-                             settings.GCOIN_RPC['port'])
+    return connect_to_remote(settings.BITCOIN_RPC['user'],
+                             settings.BITCOIN_RPC['password'],
+                             settings.BITCOIN_RPC['host'],
+                             settings.BITCOIN_RPC['port'])
 
-class GcoinRPCMixin(object):
+class BitcoinRPCMixin(object):
 
     def __init__(self):
         self.conn = get_rpc_connection()
@@ -46,7 +46,7 @@ class GcoinRPCMixin(object):
         return self.conn.getrawtransaction(tx_hash)
 
 
-class TxNotifyDaemon(GcoinRPCMixin):
+class TxNotifyDaemon(BitcoinRPCMixin):
 
     def __init__(self):
         super(TxNotifyDaemon, self).__init__()
@@ -132,7 +132,7 @@ class TxNotifyDaemon(GcoinRPCMixin):
             time.sleep(SLEEP_TIME)
 
 
-class AddressNotifyDaemon(GcoinRPCMixin):
+class AddressNotifyDaemon(BitcoinRPCMixin):
 
     def call_request(self, post_data, notification):
         headers = {'content-type': "application/x-www-form-urlencoded"}
