@@ -3,6 +3,8 @@ import hashlib
 import struct
 import re
 
+from django.conf import settings
+
 import base58
 from gcoin import ripemd
 
@@ -10,6 +12,25 @@ pubkey_hash_re = re.compile(r'^76a914[a-f0-9]{40}88ac$')
 pubkey_re = re.compile(r'^21[a-f0-9]{66}ac$')
 script_hash_re = re.compile(r'^a914[a-f0-9]{40}87$')
 
+BLK_PATH = {
+    'MAINNET': 'blocks',
+    'TESTNET': 'testnet3/blocks'
+}
+
+MAGIC_NUMBER = {
+    'MAINNET': 3652501241,      #0xD9B4BEF9
+    'TESTNET': 118034699        #0x0709110B
+}
+
+P2PKH_ADDRESS_PREFIX = {
+    'MAINNET': b'\x00',
+    'TESTNET': b'\x6F'
+}
+
+P2SH_ADDRESS_PREFIX = {
+    'MAINNET': b'\x05',
+    'MAINNET': b'\xC4'
+}
 
 def uint1(stream):
     return ord(stream.read(1))
@@ -64,7 +85,7 @@ def intLE(num):
 
 def addressFromScriptPubKey(script_pub_key):
     script_pub_key = script_pub_key.lower()
-    version_prefix = b'\x00'
+    version_prefix = P2PKH_ADDRESS_PREFIX[settings.NET]
     # pay to pubkey hash
     if pubkey_hash_re.match(script_pub_key):
         pubkey_hash = binascii.unhexlify(script_pub_key[6:-4])
@@ -75,7 +96,7 @@ def addressFromScriptPubKey(script_pub_key):
     # pay to script hash
     elif script_hash_re.match(script_pub_key):
         pubkey_hash = binascii.unhexlify(script_pub_key[4:-2])
-        version_prefix = b'\x05'
+        version_prefix = P2SH_ADDRESS_PREFIX[settings.NET]
     else:
         return ''
 

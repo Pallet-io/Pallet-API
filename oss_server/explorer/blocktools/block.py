@@ -1,10 +1,12 @@
 import hashlib
 
+from django.conf import settings
+
 from blocktools import *
 from gcoin.transaction import serialize
 
 
-MAGIC = 3652501241
+MAGIC = MAGIC_NUMBER[settings.NET]
 SKIP_LIMIT = 100
 
 class BlockHeader:

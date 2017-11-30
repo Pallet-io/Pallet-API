@@ -14,7 +14,7 @@ from .models import Address, Datadir, Tx, TxIn, TxOut
 from .models import Block as BlockDb
 
 logger = logging.getLogger(__name__)
-BLK_DIR = settings.BLK_DIR
+BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 
 def close_old_connections():
     for conn in connections.all():
