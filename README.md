@@ -78,9 +78,13 @@ DATABASES = {
 
 #### Sync database with blockchain
 
-`<BLK_DIR>`
+`<NET>`
 
-The data forlder, which are usually located under `~/.bitcoin/blocks`
+Set `MAINNET` to update blocks of bitcoin mainnet and `TESTNET` for testnet.
+
+`<BTC_DIR>`
+
+The data forlder, which are usually located under `~/.bitcoin`
 
 It is the key point for entire OSS project. The Django command called `blockupdate` will read all the blockchain data under this forlder every second by default and save these data to specified database.
 
