@@ -40,5 +40,8 @@ DATABASES = {
     }
 }
 
-# Absolute path to Bitcoin blockchain data.
-BLK_DIR = '<BLK_DIR>'
+# MAINNET / TESTNET
+NET = '<NET>'
+
+# Absolute path to .bitcoin.
+BTC_DIR = '<BTC_DIR>'
