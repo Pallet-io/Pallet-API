@@ -34,7 +34,7 @@ class BlockHeader:
     @property
     def blockHash(self):
         headerHex = (intLE(self.version) + hashStrLE(self.previousHash) + hashStrLE(self.merkleHash)
-                      + intLE(self.time) + intLE(self.bits) + intLE(self.nonce))
+                      + uintLE(self.time) + uintLE(self.bits) + uintLE(self.nonce))
         headerBin = headerHex.decode('hex')
         hash_ = hashlib.sha256(hashlib.sha256(headerBin).digest()).digest()
         return hash_[::-1].encode('hex_codec')

@@ -83,6 +83,10 @@ def intLE(num):
     return struct.pack("<i", (num) % 2**32).encode('hex')
 
 
+def uintLE(num):
+    return struct.pack("<I", (num) % 2**32).encode('hex')
+
+
 def addressFromScriptPubKey(script_pub_key):
     script_pub_key = script_pub_key.lower()
     version_prefix = P2PKH_ADDRESS_PREFIX[settings.NET]
