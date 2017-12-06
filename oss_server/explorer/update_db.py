@@ -171,7 +171,7 @@ class BlockDBUpdater(object):
             block_db.height = 0
 
         block_db.save()
-        logger.info("Block saved: {}".format(hashStr(block_db.hash)))
+        logger.info("Block saved: {}".format(block_db.hash))
 
         for tx in block.Txs:
             self._raw_tx_to_db(tx, block_db)
