@@ -166,8 +166,8 @@ class BlockDBUpdater(object):
         )
 
         try:
-            hash_prev = hashStr(blockheader.previousHash)
-            prev_block = BlockDb.objects.get(hash=hash_prev)
+            prev_hash = hashStr(blockheader.previousHash)
+            prev_block = BlockDb.objects.get(hash=prev_hash)
             block_db.prev_block = prev_block
             block_db.chain_work = prev_block.chain_work + blockheader.blockWork
             block_db.height = prev_block.height + 1
@@ -176,15 +176,11 @@ class BlockDBUpdater(object):
             block_db.chain_work = blockheader.blockWork
             block_db.height = 0
             # Not Genesis block
-            if not hash_prev == '0000000000000000000000000000000000000000000000000000000000000000':
+            if not prev_hash == '0000000000000000000000000000000000000000000000000000000000000000':
                 # Orpahn block
-                orphan_list = Orphan_Block.setdefault(hash_prev, {})
-                if not orphan_list:
-                    Orphan_Block[hash_prev] = [block_db]
-                else:
-                    Orphan_Block[hash_prev].append(block_db)
-                logger.info("Orphan!! Miss parent block: {}".format(hash_prev))
-                logger.info("Orpahn size: {}".format(len(Orphan_Block)))
+                orphan_list = Orphan_Block.setdefault(prev_hash, [])
+                orphan_list.append(block_db)
+                logger.info("Orphan!! Miss parent block: {}".format(prev_hash))
 
         block_db.save()
         logger.info("Block saved: {}".format(block_db.hash))
@@ -210,7 +206,6 @@ class BlockDBUpdater(object):
                 Orphan_Block[parent_db.hash].remove(orphan_db)
                 if not Orphan_Block[parent_db.hash]:
                     del Orphan_Block[parent_db.hash]
-                logger.info("Orpahn size: {}".format(len(Orphan_Block)))
 
                 # Recursive store orphan to db
                 self._orphan_to_db(orphan_db)
