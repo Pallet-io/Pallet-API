@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 
 # Orpahn block
-# { [parenthash] : list_of_orphan_block_object }
+# { hash_of_parent_block : list_of_orphan_block_object }
 Orphan_Block = {}
 
 def close_old_connections():
@@ -172,27 +172,33 @@ class BlockDBUpdater(object):
             block_db.chain_work = prev_block.chain_work + blockheader.blockWork
             block_db.height = prev_block.height + 1
 
+            block_db.save()
+            logger.info("Block saved: {}".format(block_db.hash))
+
+            # Try to save orphan block
+            self._orphan_to_db(block_db)
+
+            for tx in block.Txs:
+                self._raw_tx_to_db(tx, block_db)
+
         except Exception as e:
-            block_db.chain_work = blockheader.blockWork
-            block_db.height = 0
-            # Not Genesis block
-            if not prev_hash == '0000000000000000000000000000000000000000000000000000000000000000':
+            if prev_hash == '0000000000000000000000000000000000000000000000000000000000000000':
+                # Genesis block
+                block_db.chain_work = blockheader.blockWork
+                block_db.height = 0
+
+                block_db.save()
+                logger.info("Genesis block saved: {}".format(block_db.hash))
+
+                for tx in block.Txs:
+                    self._raw_tx_to_db(tx, block_db)
+            else:
                 # Orpahn block
                 orphan_list = Orphan_Block.setdefault(prev_hash, [])
                 orphan_list.append(block_db)
                 logger.info("Orphan!! Miss parent block: {}".format(prev_hash))
 
-        block_db.save()
-        logger.info("Block saved: {}".format(block_db.hash))
-        # Store orphans if it's parent of some orphan block.
-        # Do not store if it's orphan, too.
-        if block_db.height > 0:
-            self._orphan_to_db(block_db)
-
-        for tx in block.Txs:
-            self._raw_tx_to_db(tx, block_db)
-
-    # Store orphan block to db
+    # Try to save orphan block.
     def _orphan_to_db(self, parent_db):
         orphan_list = Orphan_Block.get(parent_db.hash, {})
         for orphan_db in orphan_list:
@@ -201,7 +207,7 @@ class BlockDBUpdater(object):
                 orphan_db.height = parent_db.height + 1
                 orphan_db.chain_work = parent_db.chain_work + 1
                 orphan_db.save()
-                logger.info("Update orphan: {}".format(orphan_db.hash))
+                logger.info("Orphan block saved: {}".format(orphan_db.hash))
 
                 Orphan_Block[parent_db.hash].remove(orphan_db)
                 if not Orphan_Block[parent_db.hash]:
