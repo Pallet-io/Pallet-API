@@ -16,6 +16,10 @@ from .models import Block as BlockDb
 logger = logging.getLogger(__name__)
 BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 
+# Orpahn block
+# { [parenthash] : list_of_orphan_block_object }
+Orphan_Block = {}
+
 def close_old_connections():
     for conn in connections.all():
         conn.close_if_unusable_or_obsolete()
@@ -162,19 +166,57 @@ class BlockDBUpdater(object):
         )
 
         try:
-            prev_block = BlockDb.objects.get(hash=hashStr(blockheader.previousHash))
+            hash_prev = hashStr(blockheader.previousHash)
+            prev_block = BlockDb.objects.get(hash=hash_prev)
             block_db.prev_block = prev_block
             block_db.chain_work = prev_block.chain_work + blockheader.blockWork
             block_db.height = prev_block.height + 1
+
         except Exception as e:
             block_db.chain_work = blockheader.blockWork
             block_db.height = 0
+            # Not Genesis block
+            if not hash_prev == '0000000000000000000000000000000000000000000000000000000000000000':
+                # Orpahn block
+                orphan_list = Orphan_Block.setdefault(hash_prev, {})
+                if not orphan_list:
+                    Orphan_Block[hash_prev] = [block_db]
+                else:
+                    Orphan_Block[hash_prev].append(block_db)
+                logger.info("Orphan!! Miss parent block: {}".format(hash_prev))
+                logger.info("Orpahn size: {}".format(len(Orphan_Block)))
 
         block_db.save()
         logger.info("Block saved: {}".format(block_db.hash))
+        # Store orphans if it's parent of some orphan block.
+        # Do not store if it's orphan, too.
+        if block_db.height > 0:
+            self._orphan_to_db(block_db)
 
         for tx in block.Txs:
             self._raw_tx_to_db(tx, block_db)
+
+    # Store orphan block to db
+    def _orphan_to_db(self, parent_db):
+        orphan_list = Orphan_Block.get(parent_db.hash, {})
+        for orphan_db in orphan_list:
+            try:
+                orphan_db.prev_block = parent_db
+                orphan_db.height = parent_db.height + 1
+                orphan_db.chain_work = parent_db.chain_work + 1
+                orphan_db.save()
+                logger.info("Update orphan: {}".format(orphan_db.hash))
+
+                Orphan_Block[parent_db.hash].remove(orphan_db)
+                if not Orphan_Block[parent_db.hash]:
+                    del Orphan_Block[parent_db.hash]
+                logger.info("Orpahn size: {}".format(len(Orphan_Block)))
+
+                # Recursive store orphan to db
+                self._orphan_to_db(orphan_db)
+
+            except Exception as e:
+                logger.error("Fail to fetch orphan block.")
 
     def _raw_tx_to_db(self, tx, block_db):
         tx_db = Tx(
@@ -212,7 +254,7 @@ class BlockDBUpdater(object):
                     break
                 except Tx.DoesNotExist:
                     block = block.prev_block
-            
+
         txin_db.save()
 
     def _raw_txout_to_db(self, txout, position, tx_db):
