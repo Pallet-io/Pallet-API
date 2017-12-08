@@ -155,46 +155,56 @@ class GeneralTxView(CsrfExemptMixin, View):
 
     @staticmethod
     def _validate_json_obj(json_obj):
-        if len(json_obj['tx_info']) < 1:
-            return '`tx_info` does not have any item'
+        if len(json_obj['tx_in']) < 1:
+            return '`tx_in` does not have any item'
+        if len(json_obj['tx_out']) < 1:
+            return '`tx_out` does not have any item'
 
-        tx_info_key_set = {'from_address', 'to_address', 'amount'}
-        for tx_info in json_obj['tx_info']:
-            if not tx_info_key_set <= set(tx_info.keys()):
-                return 'objects in `tx_info` should contain keys `from_address`, `to_address`, `amount`'
+        tx_in_key_set = {'from_address', 'amount'}
+        tx_out_key_set = {'to_address', 'amount'}
+
+        for tx_in in json_obj['tx_in']:
+            if not tx_in_key_set <= set(tx_in.keys()):
+                return 'objects in `tx_in` should contain keys `from_address`, `amount`'
             try:
-                address_validator(tx_info['from_address'])
+                address_validator(tx_in['from_address'])
             except ValidationError:
-                return 'invalid address {}'.format(tx_info['from_address'])
+                return 'invalid address {}'.format(tx_in['from_address'])
+            tx_in['amount'] = Decimal(tx_in['amount'])
+            tx_in['fee'] = Decimal(tx_in['fee'])
+
+        for tx_out in json_obj['tx_out']:
+            if not tx_out_key_set <= set(tx_out.keys()):
+                return 'objects in `tx_out` should contain keys `to_address`, `amount`'
             try:
-                address_validator(tx_info['to_address'])
+                address_validator(tx_out['to_address'])
             except ValidationError:
-                return 'invalid address {}'.format(tx_info['to_address'])
-            tx_info['amount'] = Decimal(tx_info['amount'])
+                return 'invalid address {}'.format(tx_out['to_address'])
+            tx_out['amount'] = Decimal(tx_out['amount'])
+
 
     @staticmethod
-    def _aggregate_inputs(tx_info_list):
-        tx_info_in = {}
+    def _aggregate_inputs(tx_in_list):
+        tx_ins = {}
 
-        for tx_info in tx_info_list:
-            from_address = tx_info['from_address']
+        for tx_in in tx_in_list:
+            from_address = tx_in['from_address']
+            tx_ins.setdefault(from_address, {'amount': 0, 'fee': 0})
+            tx_ins[from_address]['amount'] += tx_in['amount']
+            tx_ins[from_address]['fee'] += tx_in['fee']
 
-            addr_in = tx_info_in.setdefault(from_address, 0)
-            tx_info_in[from_address] += tx_info['amount']
-
-        return tx_info_in
+        return tx_ins
 
     @staticmethod
-    def _aggregate_outputs(tx_info_list):
-        tx_info_out = {}
+    def _aggregate_outputs(tx_out_list):
+        tx_outs = {}
 
-        for tx_info in tx_info_list:
-            to_address = tx_info['to_address']
+        for tx_out in tx_out_list:
+            to_address = tx_out['to_address']
+            tx_outs.setdefault(to_address, 0)
+            tx_outs[to_address] += tx_out['amount']
 
-            addr_in = tx_info_out.setdefault(to_address, 0)
-            tx_info_out[to_address] += tx_info['amount']
-
-        return tx_info_out
+        return tx_outs
 
     def post(self, request, *args, **kwargs):
         try:
@@ -207,64 +217,38 @@ class GeneralTxView(CsrfExemptMixin, View):
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
         op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
-        tx_info_ins = self._aggregate_inputs(json_obj['tx_info'])
-        tx_info_outs = self._aggregate_outputs(json_obj['tx_info'])
+        tx_addr_ins = self._aggregate_inputs(json_obj['tx_in'])
+        tx_addr_outs = self._aggregate_outputs(json_obj['tx_out'])
 
-        tx_vins = []
-        tx_vouts = []
-        fee_included = False
-        fee_address = json_obj['tx_info'][0]['from_address']
+        tx_ins = []
+        tx_outs = []
 
-        for from_address, amount in tx_info_ins.items():
+        for from_address, amount in tx_addr_ins.items():
             utxos = get_rpc_connection().gettxoutaddress(from_address)
 
-            vins = select_utxo(utxos=utxos, sum=amount)
+            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
                 error_msg = 'insufficient amount in address {}'.format(from_address)
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
-            change = balance_from_utxos(vins) - amount
+            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
 
-            if from_address == fee_address :
-                vins = select_utxo(utxos=utxos, sum=amount+1)
-                if not vins:
-                    error_msg = 'insufficient fee in address {}'.format(from_address)
-                    return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
-                fee_included = True
-                change = balance_from_utxos(vins) - (amount + 1)
-
-            tx_vins += [utxo_to_txin(utxo) for utxo in vins]
+            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
 
             if change:
-                    tx_vouts.append({'address': from_address,
-                                     'value': int(change * 10**8)})
+                    tx_outs.append({'address': from_address,
+                                    'value': int(change * 10**8)})
 
-        if not fee_included:
-            utxos = get_rpc_connection().gettxoutaddress(fee_address)
-
-            vins = select_utxo(utxos=utxos, sum=1)
-            if not vins:
-                error_msg = 'insufficient fee in address {}'.format(fee_address)
-                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
-            tx_vins += [utxo_to_txin(utxo) for utxo in vins]
-
-            change = balance_from_utxos(vins)[1] - 1
-            if change:
-                tx_vouts.append({'address': fee_address,
-                                 'value': int(change * 10**8)})
-
-        for to_address, amount in tx_info_outs.items():
-            tx_vouts.append({'address': to_address,
-                             'value': int(amount * 10**8)})
+        for to_address, amount in tx_addr_outs.items():
+            tx_outs.append({'address': to_address,
+                            'value': int(amount * 10**8)})
 
         if op_return_data:
-            tx_vouts.append({
+            tx_outs.append({
                 'script': mk_op_return_script(op_return_data.encode('utf8')),
                 'value': 0
             })
 
-            raw_tx = make_raw_tx(tx_vins, tx_vouts)
-        else:
-            raw_tx = make_raw_tx(tx_vins, tx_vouts)
+        raw_tx = make_raw_tx(tx_ins, tx_outs)
 
         return JsonResponse({'raw_tx': raw_tx})
