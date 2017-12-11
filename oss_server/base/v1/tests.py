@@ -1,4 +1,5 @@
 import httplib
+import json
 import mock
 
 from django.test import TestCase
@@ -122,6 +123,40 @@ class GetBalanceTest(TestCase):
         response = self.client.get(self.wrong_address_url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json(), {'balance': 0})
+
+
+class GeneralTxTest(TestCase):
+
+    def setUp(self):
+        self.url = '/base/v1/general-transaction/prepare'
+        self.sample_txoutaddress = [
+            {'txid': 'b67399d1d520a8646a592485c9f2004bd7e79729354cc0717101c3b1fa0a1e15',
+             'vout': 0,
+             'value': 2,
+             'scriptPubKey': '2103dd5ed2dd68648b0a77a4a7f3e23c35e05f311e14e73a8012304f0e22ce3ae23fac'},
+            {'txid': '6324183149d9093e7454ec9f3141b8d3d543431ebc7f2e22dd00528de72b8351',
+             'vout': 0,
+             'value': 10,
+             'scriptPubKey': '76a914232e8540e8a3ff0b688854def11147970e7b6ce188ac'},
+        ]
+        self.from_address = '17nJ6HR8aiNhNf6f7UTm5fRT6DDGCCJ9Rt'
+        self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_create_raw_tx_using(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        tx_info = [{
+            'from_address': self.from_address,
+            'to_address': self.to_address,
+            'amount': 11
+        }]
+        data = {
+            'tx_info': tx_info,
+            'op_return_data': 'abcde'
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
 
 
 class CreateRawTxTest(TestCase):
