@@ -10,7 +10,7 @@ from django.db import connections
 from blocktools.block import Block
 from blocktools.blocktools import *
 
-from .models import Address, Datadir, Tx, TxIn, TxOut
+from .models import Address, Datadir, Tx, TxIn, TxOut, Orphan
 from .models import Block as BlockDb
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ class BlockUpdateDaemon(object):
         self.updater = BlockDBUpdater(self.blk_dir, self.batch_num)
 
     def run_forever(self):
+        self._load_orphan_state()
         while True:
             try:
                 self.updater.update()
@@ -45,6 +46,19 @@ class BlockUpdateDaemon(object):
             close_old_connections()
             sleep(self.sleep_time)
 
+    def _load_orphan_state(self):
+        """ To ensure data integrity. """
+        for orphan in Orphan.objects.all():
+            orphan_list = Orphan_Block.setdefault(orphan.hash, [])
+            try:
+                orphan_db = BlockDb.objects.get(hash = orphan.orphan_hash)
+                if orphan_db.prev_block or orphan_db.height or orphan_db.chain_work:
+                    # Because of atomic. Orphan DB must be updated when BlockDb of orpahan block are updated.
+                    logger.error('Error, it must be None.')
+                orphan_list.append(orphan_db)
+                orphan_db.save()
+            except Exception as e:
+                logger.exception('Error when load orphan state: {}'.format(e))
 
 class BlockDBUpdater(object):
 
@@ -150,6 +164,7 @@ class BlockDBUpdater(object):
         datadir = self._get_or_create_datadir()
         datadir.blkfile_offset = blockchain.tell()
         datadir.save()
+        self._store_orphan_state()
 
     def _raw_block_to_db(self, block):
         blockheader = block.blockHeader
@@ -165,38 +180,40 @@ class BlockDBUpdater(object):
             tx_count=len(block.Txs)
         )
 
-        try:
-            prev_hash = hashStr(blockheader.previousHash)
-            prev_block = BlockDb.objects.get(hash=prev_hash)
+        prev_hash = hashStr(blockheader.previousHash)
+        prev_block_list = BlockDb.objects.filter(hash=prev_hash)
+
+        if len(prev_block_list) > 1:
+            logger.error("More than 1 parent block. {}".format(block_db.hash))
+
+        elif len(prev_block_list) == 1 and (prev_block_list[0].prev_block or prev_block_list[0].height == 0):
+            prev_block = prev_block_list[0]
             block_db.prev_block = prev_block
             block_db.chain_work = prev_block.chain_work + blockheader.blockWork
             block_db.height = prev_block.height + 1
 
-            block_db.save()
-            logger.info("Block saved: {}".format(block_db.hash))
-
-            # Try to save orphan block
-            self._orphan_to_db(block_db)
-
-            for tx in block.Txs:
-                self._raw_tx_to_db(tx, block_db)
-
-        except Exception as e:
+        else:
             if prev_hash == '0000000000000000000000000000000000000000000000000000000000000000':
                 # Genesis block
                 block_db.chain_work = blockheader.blockWork
                 block_db.height = 0
 
-                block_db.save()
-                logger.info("Genesis block saved: {}".format(block_db.hash))
-
-                for tx in block.Txs:
-                    self._raw_tx_to_db(tx, block_db)
             else:
                 # Orpahn block
                 orphan_list = Orphan_Block.setdefault(prev_hash, [])
                 orphan_list.append(block_db)
                 logger.info("Orphan!! Miss parent block: {}".format(prev_hash))
+
+        block_db.save()
+        logger.info("Block saved: {}".format(block_db.hash))
+
+        if block_db.prev_block:
+            # Try to update orphan block
+            self._orphan_to_db(block_db)
+
+        for tx in block.Txs:
+            self._raw_tx_to_db(tx, block_db)
+
 
     # Try to save orphan block.
     def _orphan_to_db(self, parent_db):
@@ -207,7 +224,12 @@ class BlockDBUpdater(object):
                 orphan_db.height = parent_db.height + 1
                 orphan_db.chain_work = parent_db.chain_work + 1
                 orphan_db.save()
-                logger.info("Orphan block saved: {}".format(orphan_db.hash))
+                logger.info("Orphan block update: {}".format(orphan_db.hash))
+
+                tx_list = Tx.objects.filter(block=orphan_db)
+                tx_list.update(valid=1)
+                for tx_db in tx_list:
+                    TxOut.objects.filter(tx=tx_db).update(valid=1)
 
                 Orphan_Block[parent_db.hash].remove(orphan_db)
                 if not Orphan_Block[parent_db.hash]:
@@ -226,7 +248,8 @@ class BlockDBUpdater(object):
             version=tx.version,
             locktime=tx.lockTime,
             size=tx.size,
-            time=block_db.time
+            time=block_db.time,
+            valid=1 if block_db.prev_block else 0
         )
         tx_db.save()
 
@@ -263,7 +286,8 @@ class BlockDBUpdater(object):
               value=txout.value,
               position=position,
               scriptpubkey=txout.pubkey,
-              address=Address.objects.get_or_create(address=txout.address)[0]
+              address=Address.objects.get_or_create(address=txout.address)[0],
+              valid=tx_db.valid
               ).save()
 
     def _get_or_create_datadir(self):
@@ -300,3 +324,15 @@ class BlockDBUpdater(object):
             return file_path
         else:
             return None
+
+    def _store_orphan_state(self):
+        """ To ensure data integrity. """
+        # Clean
+        Orphan.objects.all().delete()
+        # Store
+        for parent, orphan_list in Orphan_Block.iteritems():
+            for orphan in orphan_list:
+                Orphan(
+                       hash=parent,
+                       orphan_hash=orphan.hash,
+                       ).save()

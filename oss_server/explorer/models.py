@@ -106,6 +106,7 @@ class Tx(models.Model):
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     size = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True, db_index=True)
+    valid = models.DecimalField(max_digits=1, decimal_places=0, default=0)
 
     def as_dict(self):
         return OrderedDict([
@@ -130,6 +131,7 @@ class TxOut(models.Model):
     scriptpubkey = models.BinaryField(blank=True, null=True)
     address = models.ForeignKey(Address, related_name='tx_outs', related_query_name='tx_out')
     spent = models.DecimalField(max_digits=1, decimal_places=0, default=0)
+    valid = models.DecimalField(max_digits=1, decimal_places=0, default=0)
 
     @property
     def is_op_return(self):
@@ -181,3 +183,7 @@ class TxIn(models.Model):
             ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
         ])
+
+class Orphan(models.Model):
+    hash = models.CharField(unique=True, max_length=64)
+    orphan_hash = models.CharField(unique=True, max_length=64)
