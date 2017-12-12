@@ -5,6 +5,7 @@ import logging
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import DecimalValidator
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -13,7 +14,7 @@ from gcoin import (make_raw_tx, mk_op_return_script)
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from oss_server.utils import address_validator
+from oss_server.utils import address_validator, amount_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
 from .forms import RawTxForm
@@ -155,14 +156,10 @@ class GeneralTxView(CsrfExemptMixin, View):
 
     @staticmethod
     def _validate_json_obj(json_obj):
+        # Validation of input
         if len(json_obj['tx_in']) < 1:
-            return '`tx_in` does not have any item'
-        if len(json_obj['tx_out']) < 1:
-            return '`tx_out` does not have any item'
-
+            return '`tx_in` is required'
         tx_in_key_set = {'from_address', 'amount'}
-        tx_out_key_set = {'to_address', 'amount'}
-
         for tx_in in json_obj['tx_in']:
             if not tx_in_key_set <= set(tx_in.keys()):
                 return 'objects in `tx_in` should contain keys `from_address`, `amount`'
@@ -171,8 +168,17 @@ class GeneralTxView(CsrfExemptMixin, View):
             except ValidationError:
                 return 'invalid address {}'.format(tx_in['from_address'])
             tx_in['amount'] = Decimal(tx_in['amount'])
+            try:
+                amount_validator(tx_in['amount'], min_value = 0, max_value = 10**10, decimal_places = 8)
+            except ValidationError as err:
+                print err.value
             tx_in['fee'] = Decimal(tx_in['fee'])
 
+
+        # Validation of output
+        if len(json_obj['tx_out']) < 1:
+            return '`tx_out` is required'
+        tx_out_key_set = {'to_address', 'amount'}
         for tx_out in json_obj['tx_out']:
             if not tx_out_key_set <= set(tx_out.keys()):
                 return 'objects in `tx_out` should contain keys `to_address`, `amount`'
@@ -208,7 +214,7 @@ class GeneralTxView(CsrfExemptMixin, View):
 
     def post(self, request, *args, **kwargs):
         try:
-            json_obj = json.loads(request.body)
+            json_obj = json.loads(request.body, parse_int=Decimal, parse_float=Decimal)
             error_msg = self._validate_json_obj(json_obj)
         except:
             return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
@@ -228,7 +234,7 @@ class GeneralTxView(CsrfExemptMixin, View):
 
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
-                error_msg = 'insufficient amount in address {}'.format(from_address)
+                error_msg = 'insufficient funds in address {}'.format(from_address)
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
             change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
