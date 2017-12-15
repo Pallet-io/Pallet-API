@@ -83,6 +83,8 @@ DATABASES = {
 
 Set `MAINNET` to update blocks of bitcoin mainnet and `TESTNET` for testnet.
 
+Notice: Set `MAINNET` if you want to run unit test.
+
 `<BTC_DIR>`
 
 The data forlder, which are usually located under `~/.bitcoin`
@@ -96,6 +98,8 @@ Run `./manage.py blockupdate` to sync blockchain indefinitely.
 Run `./manage.py test --settings=oss_server.settings.test` for a standalone unit test.
 
 Run `./manage.py test` will create a test database specified in setting.py and destroy it after compeleting the test.
+
+Notice: You need to set `<NET>` of setting.py to `MAINNET` at first.
 
 ## Run server
 
