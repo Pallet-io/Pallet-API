@@ -51,12 +51,11 @@ class BlockUpdateDaemon(object):
         for orphan in Orphan.objects.all():
             orphan_list = Orphan_Block.setdefault(orphan.hash, [])
             try:
-                orphan_db = BlockDb.objects.get(hash = orphan.orphan_hash)
+                orphan_db = BlockDb.objects.get(hash=orphan.orphan_hash)
                 if orphan_db.prev_block or orphan_db.height or orphan_db.chain_work:
                     # Because of atomic. Orphan DB must be updated when BlockDb of orpahan block are updated.
                     logger.error('Error, it must be None.')
                 orphan_list.append(orphan_db)
-                orphan_db.save()
             except Exception as e:
                 logger.exception('Error when load orphan state: {}'.format(e))
 
@@ -242,16 +241,14 @@ class BlockDBUpdater(object):
                 logger.error("Fail to fetch orphan block.")
 
     def _raw_tx_to_db(self, tx, block_db):
-        tx_db = Tx(
-            hash=tx.txHash,
-            block=block_db,
-            version=tx.version,
-            locktime=tx.lockTime,
-            size=tx.size,
-            time=block_db.time,
-            valid=1 if block_db.prev_block else 0
-        )
-        tx_db.save()
+        tx_db = Tx.objects.create(hash=tx.txHash,
+                                  block=block_db,
+                                  version=tx.version,
+                                  locktime=tx.lockTime,
+                                  size=tx.size,
+                                  time=block_db.time,
+                                  valid=1 if block_db.prev_block else 0
+                                  )
 
         for txin in tx.inputs:
             self._raw_txin_to_db(txin, tx_db)
@@ -282,13 +279,13 @@ class BlockDBUpdater(object):
         txin_db.save()
 
     def _raw_txout_to_db(self, txout, position, tx_db):
-        TxOut(tx=tx_db,
-              value=txout.value,
-              position=position,
-              scriptpubkey=txout.pubkey,
-              address=Address.objects.get_or_create(address=txout.address)[0],
-              valid=tx_db.valid
-              ).save()
+        TxOut.objects.create(tx=tx_db,
+                             value=txout.value,
+                             position=position,
+                             scriptpubkey=txout.pubkey,
+                             address=Address.objects.get_or_create(address=txout.address)[0],
+                             valid=tx_db.valid
+                             )
 
     def _get_or_create_datadir(self):
         """
@@ -332,7 +329,6 @@ class BlockDBUpdater(object):
         # Store
         for parent, orphan_list in Orphan_Block.iteritems():
             for orphan in orphan_list:
-                Orphan(
-                       hash=parent,
-                       orphan_hash=orphan.hash,
-                       ).save()
+                Orphan.objects.create(hash=parent,
+                                      orphan_hash=orphan.hash
+                                      )
