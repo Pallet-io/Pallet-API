@@ -202,7 +202,7 @@ class GeneralTxTest(TestCase):
         }
         response = self.client.post(self.url, json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'invalid data'})
+        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
 
     def test_missing_form_data(self):
         response = self.client.post(self.url, json.dumps({}), content_type='application/json')

@@ -165,14 +165,20 @@ class GeneralTxView(CsrfExemptMixin, View):
                 return 'objects in `tx_in` should contain keys `from_address`, `amount`'
             try:
                 address_validator(tx_in['from_address'])
-            except ValidationError:
-                return 'invalid address {}'.format(tx_in['from_address'])
+            except ValidationError as e:
+                return unicode(e.message) % e.params
+
             tx_in['amount'] = Decimal(tx_in['amount'])
             try:
                 amount_validator(tx_in['amount'], min_value = 0, max_value = 10**10, decimal_places = 8)
-            except ValidationError as err:
-                print err.value
+            except ValidationError as e:
+                return unicode(e.message) % e.params
+
             tx_in['fee'] = Decimal(tx_in['fee'])
+            try:
+                amount_validator(tx_in['fee'], min_value = 0, max_value = 10**10, decimal_places = 8)
+            except ValidationError as e:
+                return unicode(e.message) % e.params
 
 
         # Validation of output
@@ -184,10 +190,14 @@ class GeneralTxView(CsrfExemptMixin, View):
                 return 'objects in `tx_out` should contain keys `to_address`, `amount`'
             try:
                 address_validator(tx_out['to_address'])
-            except ValidationError:
-                return 'invalid address {}'.format(tx_out['to_address'])
-            tx_out['amount'] = Decimal(tx_out['amount'])
+            except ValidationError as e:
+                return unicode(e.message) % e.params
 
+            tx_out['amount'] = Decimal(tx_out['amount'])
+            try:
+                amount_validator(tx_out['amount'], min_value = 0, max_value = 10**10, decimal_places = 8)
+            except ValidationError as e:
+                return unicode(e.message) % e.params
 
     @staticmethod
     def _aggregate_inputs(tx_in_list):
