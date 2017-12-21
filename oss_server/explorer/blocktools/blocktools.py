@@ -29,7 +29,7 @@ P2PKH_ADDRESS_PREFIX = {
 
 P2SH_ADDRESS_PREFIX = {
     'MAINNET': b'\x05',
-    'MAINNET': b'\xC4'
+    'TESTNET': b'\xC4'
 }
 
 def uint1(stream):

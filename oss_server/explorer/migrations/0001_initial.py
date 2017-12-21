@@ -43,6 +43,15 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
+            name='Orphan',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('hash', models.CharField(max_length=64)),
+                ('orphan_hash', models.CharField(max_length=64, unique=True)),
+            ],
+        ),
+
+        migrations.CreateModel(
             name='Datadir',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -63,6 +72,7 @@ class Migration(migrations.Migration):
                 ('size', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('time', models.DecimalField(blank=True, db_index=True, decimal_places=0, max_digits=20, null=True)),
                 ('block', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='txs', related_query_name='tx', to='explorer.Block')),
+                ('valid', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
             ],
         ),
         migrations.CreateModel(
@@ -84,6 +94,7 @@ class Migration(migrations.Migration):
                 ('spent', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
                 ('address', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_outs', related_query_name='tx_out', to='explorer.Address')),
                 ('tx', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_outs', related_query_name='tx_out', to='explorer.Tx')),
+                ('valid', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
             ],
         ),
         migrations.AddField(
