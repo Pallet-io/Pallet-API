@@ -18,7 +18,7 @@ BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 
 # Orpahn block
 # { hash_of_parent_block : list_of_orphan_block_object }
-Orphan_Block = {}
+orphan_block = {}
 
 def close_old_connections():
     for conn in connections.all():
@@ -49,7 +49,7 @@ class BlockUpdateDaemon(object):
     def _load_orphan_state(self):
         """ To ensure data integrity. """
         for orphan in Orphan.objects.all():
-            orphan_list = Orphan_Block.setdefault(orphan.hash, [])
+            orphan_list = orphan_block.setdefault(orphan.hash, [])
             try:
                 orphan_db = BlockDb.objects.get(hash=orphan.orphan_hash)
                 if orphan_db.prev_block or orphan_db.height or orphan_db.chain_work:
@@ -199,7 +199,7 @@ class BlockDBUpdater(object):
 
             else:
                 # Orpahn block
-                orphan_list = Orphan_Block.setdefault(prev_hash, [])
+                orphan_list = orphan_block.setdefault(prev_hash, [])
                 orphan_list.append(block_db)
                 logger.info("Orphan!! Miss parent block: {}".format(prev_hash))
 
@@ -216,7 +216,7 @@ class BlockDBUpdater(object):
 
     # Try to save orphan block.
     def _orphan_to_db(self, parent_db):
-        orphan_list = Orphan_Block.get(parent_db.hash, {})
+        orphan_list = orphan_block.get(parent_db.hash, {})
         for orphan_db in orphan_list:
             try:
                 orphan_db.prev_block = parent_db
@@ -230,9 +230,9 @@ class BlockDBUpdater(object):
                 for tx_db in tx_list:
                     TxOut.objects.filter(tx=tx_db).update(valid=1)
 
-                Orphan_Block[parent_db.hash].remove(orphan_db)
-                if not Orphan_Block[parent_db.hash]:
-                    del Orphan_Block[parent_db.hash]
+                orphan_block[parent_db.hash].remove(orphan_db)
+                if not orphan_block[parent_db.hash]:
+                    del orphan_block[parent_db.hash]
 
                 # Recursive store orphan to db
                 self._orphan_to_db(orphan_db)
@@ -327,7 +327,7 @@ class BlockDBUpdater(object):
         # Clean
         Orphan.objects.all().delete()
         # Store
-        for parent, orphan_list in Orphan_Block.iteritems():
+        for parent, orphan_list in orphan_block.iteritems():
             for orphan in orphan_list:
                 Orphan.objects.create(hash=parent,
                                       orphan_hash=orphan.hash
