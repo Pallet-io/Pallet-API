@@ -1,4 +1,5 @@
 import httplib
+import json
 import os
 
 from django.test import TestCase
@@ -387,3 +388,105 @@ class GetAddressBalanceTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, httplib.OK)
         self.assertEqual(response.json().get('balance'), 0)
+
+
+class CreateRawTxTest(TestCase):
+
+    def setUp(self):
+        self.url = '/explorer/v1/transaction/prepare'
+        self.from_address = '1KeauFs1g7v7R2BCKBJWM4GacAjNn8SiRK'
+        self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
+
+    def test_create_raw_tx_using(self):
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'amount': 770})
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+    # Test insufficient fund
+    def test_create_raw_tx_without_sufficient_fee(self):
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'amount': 772})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient funds'})
+
+    def test_create_raw_tx_with_amount_exceed_8_decimal_digit(self):
+        response = self.client.get(self.url, {'from_address': self.from_address,
+                                              'to_address': self.to_address,
+                                              'amount': 0.123456789})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
+
+    def test_missing_form_data(self):
+        response = self.client.get(self.url, {})
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+
+
+class GeneralTxTest(TestCase):
+
+    def setUp(self):
+        self.url = '/explorer/v1/general-transaction/prepare'
+        self.from_address = '1KeauFs1g7v7R2BCKBJWM4GacAjNn8SiRK'
+        self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
+
+    def test_general_tx_using(self):
+        tx_in = [{
+            'from_address': self.from_address,
+            'amount':'770',
+            'fee': '1',
+        }]
+        tx_out = [{
+            'to_address': self.to_address,
+            'amount': '770',
+        }]
+        data = {
+            'tx_in': tx_in,
+            'tx_out': tx_out,
+            'op_return_data': 'abcde',
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.OK)
+        self.assertIn('raw_tx', response.json())
+
+    # Test insufficient fund
+    def test_general_tx_without_sufficient_fund(self):
+        tx_in = [{
+            'from_address': self.from_address,
+            'amount': '771',
+            'fee': '1',
+            }]
+        tx_out = [{
+            'to_address': self.to_address,
+            'amount': '771',
+        }]
+        data = {
+            'tx_in': tx_in,
+            'tx_out': tx_out,
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient funds in address {}'.format(self.from_address)})
+
+    def test_general_tx_with_amount_exceed_8_decimal_digit(self):
+        tx_in = [{
+            'from_address': self.from_address,
+            'amount': '0.123456789',
+            'fee': '1',
+            }]
+        tx_out = [{
+            'to_address': self.to_address,
+            'amount': '0.123456789',
+        }]
+        data = {
+            'tx_in': tx_in,
+            'tx_out': tx_out,
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
+
+    def test_missing_form_data(self):
+        response = self.client.post(self.url, json.dumps({}), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
