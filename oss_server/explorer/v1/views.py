@@ -303,6 +303,7 @@ class GeneralTxView(CsrfExemptMixin, View):
 
         for from_address, amount in tx_addr_ins.items():
             utxos = self._fetch_utxo(from_address)
+
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
                 error_msg = 'insufficient funds in address {}'.format(from_address)
