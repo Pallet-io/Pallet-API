@@ -89,12 +89,16 @@ class CreateRawTxView(View):
     def get(self, request, *args, **kwargs):
         form = RawTxForm(request.GET)
         if form.is_valid():
+            # Fetch the data
             from_address = form.cleaned_data['from_address']
             to_address = form.cleaned_data['to_address']
             amount = form.cleaned_data['amount']
             op_return_data = form.cleaned_data['op_return_data']
 
+            # Select the utxo for the given address
             utxos = self._fetch_utxo(from_address)
+
+            # Prepare the data for transaction
             inputs = select_utxo(utxos, amount + 1)
             if not inputs:
                 return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
@@ -113,9 +117,9 @@ class CreateRawTxView(View):
                     'script': mk_op_return_script(op_return_data.encode('utf8')),
                     'value': 0,
                 })
-                raw_tx = make_raw_tx(ins, outs)
-            else:
-                raw_tx = make_raw_tx(ins, outs)
+
+            # Create the transaction
+            raw_tx = make_raw_tx(ins, outs)
 
             return JsonResponse({'raw_tx': raw_tx})
         else:
@@ -242,6 +246,7 @@ class GeneralTxView(CsrfExemptMixin, View):
             if error_msg:
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
+        # Fetch the data
         op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
         tx_addr_ins = self._aggregate_inputs(json_obj['tx_in'])
         tx_addr_outs = self._aggregate_outputs(json_obj['tx_out'])
@@ -250,6 +255,7 @@ class GeneralTxView(CsrfExemptMixin, View):
         tx_outs = []
 
         for from_address, amount in tx_addr_ins.items():
+            # Prepare the data for transaction
             utxos = self._fetch_utxo(from_address)
 
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
@@ -275,6 +281,7 @@ class GeneralTxView(CsrfExemptMixin, View):
                 'value': 0
             })
 
+        # Create the transaction
         raw_tx = make_raw_tx(tx_ins, tx_outs)
 
         return JsonResponse({'raw_tx': raw_tx})
