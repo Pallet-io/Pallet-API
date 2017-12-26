@@ -159,8 +159,14 @@ class UtxoView(View):
         utxos = get_rpc_connection().gettxoutaddress(address)
         return JsonResponse(utxos, safe=False)
 
+class CreateTx:
 
-class GeneralTxView(CsrfExemptMixin, View):
+    @staticmethod
+    def _fetch_utxo(address):
+        utxo = get_rpc_connection().gettxoutaddress(address)
+        return utxo
+
+class GeneralTxView(CsrfExemptMixin, CreateTx, View):
     http_method_names = ['post']
 
     @staticmethod
@@ -230,11 +236,6 @@ class GeneralTxView(CsrfExemptMixin, View):
             tx_outs[to_address] += tx_out['amount']
 
         return tx_outs
-
-    @staticmethod
-    def _fetch_utxo(address):
-        utxos = get_rpc_connection().gettxoutaddress(address)
-        return utxos
 
     def post(self, request, *args, **kwargs):
         try:
