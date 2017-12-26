@@ -143,21 +143,70 @@ class GeneralTxTest(TestCase):
         self.to_address = '1MnwbemNqG4d41iGy6CeQGCPgigzLX3vyL'
 
     @mock.patch('base.v1.views.get_rpc_connection')
-    def test_create_raw_tx_using(self, mock_rpc):
+    def test_general_tx_using(self, mock_rpc):
         mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
-        tx_info = [{
+        tx_in = [{
             'from_address': self.from_address,
+            'amount':'11',
+            'fee': '1',
+        }]
+        tx_out = [{
             'to_address': self.to_address,
-            'amount': 11
+            'amount': '11',
         }]
         data = {
-            'tx_info': tx_info,
-            'op_return_data': 'abcde'
+            'tx_in': tx_in,
+            'tx_out': tx_out,
+            'op_return_data': 'abcde',
         }
         response = self.client.post(self.url, json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, httplib.OK)
         self.assertIn('raw_tx', response.json())
 
+    # Test insufficient fund
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_general_tx_without_sufficient_fund(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        tx_in = [{
+            'from_address': self.from_address,
+            'amount': '12',
+            'fee': '1',
+            }]
+        tx_out = [{
+            'to_address': self.to_address,
+            'amount': '12',
+        }]
+        data = {
+            'tx_in': tx_in,
+            'tx_out': tx_out,
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': 'insufficient funds in address {}'.format(self.from_address)})
+
+    @mock.patch('base.v1.views.get_rpc_connection')
+    def test_general_tx_with_amount_exceed_8_decimal_digit(self, mock_rpc):
+        mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
+        tx_in = [{
+            'from_address': self.from_address,
+            'amount': '0.123456789',
+            'fee': '1',
+            }]
+        tx_out = [{
+            'to_address': self.to_address,
+            'amount': '0.123456789',
+        }]
+        data = {
+            'tx_in': tx_in,
+            'tx_out': tx_out,
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
+
+    def test_missing_form_data(self):
+        response = self.client.post(self.url, json.dumps({}), content_type='application/json')
+        self.assertEqual(response.status_code, httplib.BAD_REQUEST)
 
 class CreateRawTxTest(TestCase):
 
