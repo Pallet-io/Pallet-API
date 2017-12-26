@@ -22,6 +22,7 @@ BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 # { hash_of_parent_block : list_of_orphan_block_object }
 orphan_block = {}
 
+MAX_BULK_CREATE_SIZE = 5000
 MAX_THREAD = 90
 
 def close_old_connections():
@@ -281,12 +282,19 @@ class BlockDBUpdater(object):
             thread.start()
         for thread in threads_txout_list:
             thread.join()
+        while MAX_BULK_CREATE_SIZE < len(txout_db_list):
+            TxOut.objects.bulk_create(txout_db_list[:idx+MAX_BULK_CREATE_SIZE-1])
+            txout_db_list=txout_db_list[MAX_BULK_CREATE_SIZE:]
         TxOut.objects.bulk_create(txout_db_list)
 
         for thread in threads_txin_list:
             thread.start()
         for thread in threads_txin_list:
             thread.join()
+
+        while MAX_BULK_CREATE_SIZE < len(txin_db_list):
+            TxIn.objects.bulk_create(txin_db_list[:idx+MAX_BULK_CREATE_SIZE-1])
+            txin_db_list=txin_db_list[MAX_BULK_CREATE_SIZE:]
         TxIn.objects.bulk_create(txin_db_list)
 
     def _raw_txin_to_db(self, txin, tx_db, txin_db_list):
