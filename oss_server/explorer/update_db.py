@@ -217,29 +217,34 @@ class BlockDBUpdater(object):
 
     # Try to save orphan block.
     def _orphan_to_db(self, parent_db):
-        orphan_list = orphan_block.get(parent_db.hash, {})
-        for orphan_db in orphan_list:
-            try:
-                orphan_db.prev_block = parent_db
-                orphan_db.height = parent_db.height + 1
-                orphan_db.chain_work = parent_db.chain_work + 1
-                orphan_db.save()
-                logger.info("Orphan block update: {}".format(orphan_db.hash))
+        block_stack = [parent_db]
+        while block_stack:
+            parent_db = block_stack.pop()
+            orphan_list = orphan_block.get(parent_db.hash, {})
+            for orphan_db in orphan_list:
+                try:
+                    orphan_db.prev_block = parent_db
+                    orphan_db.height = parent_db.height + 1
+                    orphan_db.chain_work = parent_db.chain_work + 1
+                    orphan_db.save()
+                    logger.info("Orphan block update: {}".format(orphan_db.hash))
 
-                tx_list = Tx.objects.filter(block=orphan_db)
-                tx_list.update(valid=1)
-                for tx_db in tx_list:
-                    TxOut.objects.filter(tx=tx_db).update(valid=1)
+                    tx_list = Tx.objects.filter(block=orphan_db)
+                    tx_list.update(valid=1)
 
-                orphan_block[parent_db.hash].remove(orphan_db)
-                if not orphan_block[parent_db.hash]:
-                    del orphan_block[parent_db.hash]
+                    for tx_db in tx_list:
+                        TxOut.objects.filter(tx=tx_db).update(valid=1)
+
+                    orphan_block[parent_db.hash].remove(orphan_db)
+                    if not orphan_block[parent_db.hash]:
+                        del orphan_block[parent_db.hash]
+
+                except Exception as e:
+                    logger.error("Fail to fetch orphan block.{}".format(e))
 
                 # Recursive store orphan to db
-                self._orphan_to_db(orphan_db)
+                block_stack.append(orphan_db)
 
-            except Exception as e:
-                logger.error("Fail to fetch orphan block.")
 
     def _raw_txs_to_db(self, tx_list, block_db):
         txin_db_list = []
