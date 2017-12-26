@@ -22,6 +22,8 @@ BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 # { hash_of_parent_block : list_of_orphan_block_object }
 orphan_block = {}
 
+MAX_THREAD = 90
+
 def close_old_connections():
     for conn in connections.all():
         conn.close_if_unusable_or_obsolete()
@@ -68,6 +70,7 @@ class BlockDBUpdater(object):
         self.batch_num = batch_num
         self.blocks_hash_cache = []
         self.lock = threading.Lock()
+        self.semaphore = threading.Semaphore(MAX_THREAD)
 
     def update(self):
         # Read the blk file (possibly from last read position) as many as possible, and check if
@@ -270,7 +273,7 @@ class BlockDBUpdater(object):
 
 
             for txin in tx.inputs:
-                thread_txin = threading.Thread(target = self._raw_txin_to_db, args=(txin, tx_db,txin_db_list), name = 'thread-in-' + str(txin_cnt))
+                thread_txin = threading.Thread(target = self._raw_txin_to_db, args=(txin, tx_db, txin_db_list), name = 'thread-in-' + str(txin_cnt))
                 threads_txin_list.append(thread_txin)
                 txin_cnt += 1
 
@@ -287,6 +290,7 @@ class BlockDBUpdater(object):
         TxIn.objects.bulk_create(txin_db_list)
 
     def _raw_txin_to_db(self, txin, tx_db, txin_db_list):
+        self.semaphore.acquire()
         txin_db = TxIn(
             tx=tx_db,
             scriptsig=txin.scriptSig,
@@ -315,9 +319,10 @@ class BlockDBUpdater(object):
         self.lock.acquire()
         txin_db_list.append(txin_db)
         self.lock.release()
+        self.semaphore.release()
 
     def _raw_txout_to_db(self, txout, position, tx_db, txout_db_list):
-
+        self.semaphore.acquire()
         address=Address.objects.get_or_create(address=txout.address)[0]
         connection.close()
         tx_out_db =TxOut(tx=tx_db,
@@ -330,6 +335,7 @@ class BlockDBUpdater(object):
         self.lock.acquire()
         txout_db_list.append(tx_out_db)
         self.lock.release()
+        self.semaphore.release()
 
     def _get_or_create_datadir(self):
         """
