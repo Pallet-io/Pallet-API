@@ -100,7 +100,7 @@ class Datadir(models.Model):
 
 
 class Tx(models.Model):
-    hash = models.CharField(max_length=64)
+    hash = models.CharField(max_length=64, db_index=True)
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
