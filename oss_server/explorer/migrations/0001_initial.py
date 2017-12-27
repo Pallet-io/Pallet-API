@@ -66,7 +66,7 @@ class Migration(migrations.Migration):
             name='Tx',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('hash', models.CharField(max_length=64)),
+                ('hash', models.CharField(max_length=64, db_index=True)),
                 ('version', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('locktime', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('size', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
