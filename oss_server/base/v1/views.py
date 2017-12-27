@@ -166,6 +166,33 @@ class CreateTx:
         utxo = get_rpc_connection().gettxoutaddress(address)
         return utxo
 
+    def prepare_tx(self, tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data):
+        for from_address, amount in tx_addr_ins.items():
+            # Prepare the data for transaction
+            utxos = self._fetch_utxo(from_address)
+
+            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
+            if not vins:
+                return 'insufficient funds in address {}'.format(from_address)
+
+            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
+
+            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
+
+            if change:
+                    tx_outs.append({'address': from_address,
+                                    'value': int(change * 10**8)})
+
+        for to_address, amount in tx_addr_outs.items():
+            tx_outs.append({'address': to_address,
+                            'value': int(amount * 10**8)})
+
+        if op_return_data:
+            tx_outs.append({
+                'script': mk_op_return_script(op_return_data.encode('utf8')),
+                'value': 0
+            })
+
 class GeneralTxView(CsrfExemptMixin, CreateTx, View):
     http_method_names = ['post']
 
@@ -255,32 +282,13 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
         tx_ins = []
         tx_outs = []
 
-        for from_address, amount in tx_addr_ins.items():
-            # Prepare the data for transaction
-            utxos = self._fetch_utxo(from_address)
-
-            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
-            if not vins:
-                error_msg = 'insufficient funds in address {}'.format(from_address)
+        try:
+            error_msg = self.prepare_tx(tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data)
+        except:
+            return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
+        else:
+            if error_msg:
                 return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
-
-            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
-
-            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
-
-            if change:
-                tx_outs.append({'address': from_address,
-                                'value': int(change * 10**8)})
-
-        for to_address, amount in tx_addr_outs.items():
-            tx_outs.append({'address': to_address,
-                            'value': int(amount * 10**8)})
-
-        if op_return_data:
-            tx_outs.append({
-                'script': mk_op_return_script(op_return_data.encode('utf8')),
-                'value': 0
-            })
 
         # Create the transaction
         raw_tx = make_raw_tx(tx_ins, tx_outs)
