@@ -81,15 +81,13 @@ class GetRawTxView(View):
 
 class CreateTx:
 
-    @staticmethod
-    def _fetch_utxo(address):
-        utxo = get_rpc_connection().gettxoutaddress(address)
-        return utxo
+    def fetch_utxo(self, address):
+        raise NotImplementedError
 
     def prepare_tx(self, tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data):
         for from_address, amount in tx_addr_ins.items():
             # Prepare the data for transaction
-            utxos = self._fetch_utxo(from_address)
+            utxos = self.fetch_utxo(from_address)
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
                 return 'insufficient funds in address {}'.format(from_address)
@@ -99,6 +97,7 @@ class CreateTx:
             tx_ins += [utxo_to_txin(utxo) for utxo in vins]
 
             if change:
+
                 tx_outs.append({'address': from_address,
                                 'value': int(change * 10**8)})
 
@@ -138,6 +137,10 @@ class CreateTx:
 
 class CreateRawTxView(CreateTx, View):
 
+    def fetch_utxo(self, address):
+        utxo = get_rpc_connection().gettxoutaddress(address)
+        return utxo
+
     def get(self, request, *args, **kwargs):
         form = RawTxForm(request.GET)
         if form.is_valid():
@@ -171,6 +174,10 @@ class CreateRawTxView(CreateTx, View):
 
 class GeneralTxView(CsrfExemptMixin, CreateTx, View):
     http_method_names = ['post']
+
+    def fetch_utxo(self, address):
+        utxo = get_rpc_connection().gettxoutaddress(address)
+        return utxo
 
     @staticmethod
     def _validate_json_obj(json_obj):
