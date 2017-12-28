@@ -79,86 +79,6 @@ class GetRawTxView(View):
         return base_tx
 
 
-class CreateRawTxView(View):
-
-    @staticmethod
-    def _fetch_utxo(address):
-        utxos = get_rpc_connection().gettxoutaddress(address)
-        return utxos
-
-    def get(self, request, *args, **kwargs):
-        form = RawTxForm(request.GET)
-        if form.is_valid():
-            # Fetch the data
-            from_address = form.cleaned_data['from_address']
-            to_address = form.cleaned_data['to_address']
-            amount = form.cleaned_data['amount']
-            op_return_data = form.cleaned_data['op_return_data']
-
-            # Select the utxo for the given address
-            utxos = self._fetch_utxo(from_address)
-
-            # Prepare the data for transaction
-            inputs = select_utxo(utxos, amount + 1)
-            if not inputs:
-                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
-
-            ins = [utxo_to_txin(utxo) for utxo in inputs]
-            outs = [{'address': to_address, 'value': int(amount * 10**8)}]
-            # Now for the `change` part.
-            inputs_value = balance_from_utxos(inputs)
-            change = inputs_value - amount - 1
-            if change:
-                outs.append({'address': from_address,
-                             'value': int(change * 10**8)})
-
-            if op_return_data:
-                outs.append({
-                    'script': mk_op_return_script(op_return_data.encode('utf8')),
-                    'value': 0,
-                })
-
-            # Create the transaction
-            raw_tx = make_raw_tx(ins, outs)
-
-            return JsonResponse({'raw_tx': raw_tx})
-        else:
-            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
-            response = {'error': errors}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-
-class SendRawTxView(CsrfExemptMixin, View):
-
-    def post(self, request, *args, **kwargs):
-        raw_tx = request.POST.get('raw_tx', '')
-        try:
-            tx_id = get_rpc_connection().sendrawtransaction(raw_tx)
-            response = {'tx_id': tx_id}
-            return JsonResponse(response)
-        except:
-            logger.error('Invalid transaction: %s', raw_tx, exc_info=True)
-            response = {'error': 'invalid raw transaction'}
-            return JsonResponse(response, status=httplib.BAD_REQUEST)
-
-
-class GetBalanceView(View):
-
-    def get(self, request, address, *args, **kwargs):
-        if request.GET.get('confirmed') == '1':
-            utxos = get_rpc_connection().gettxoutaddress(address, mempool=False)
-        else:
-            utxos = get_rpc_connection().gettxoutaddress(address)
-        balance = balance_from_utxos(utxos)
-        return JsonResponse({'balance': balance})
-
-
-class UtxoView(View):
-
-    def get(self, request, address, *args, **kwargs):
-        utxos = get_rpc_connection().gettxoutaddress(address)
-        return JsonResponse(utxos, safe=False)
-
 class CreateTx:
 
     @staticmethod
@@ -170,7 +90,6 @@ class CreateTx:
         for from_address, amount in tx_addr_ins.items():
             # Prepare the data for transaction
             utxos = self._fetch_utxo(from_address)
-
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
                 return 'insufficient funds in address {}'.format(from_address)
@@ -180,8 +99,8 @@ class CreateTx:
             tx_ins += [utxo_to_txin(utxo) for utxo in vins]
 
             if change:
-                    tx_outs.append({'address': from_address,
-                                    'value': int(change * 10**8)})
+                tx_outs.append({'address': from_address,
+                                'value': int(change * 10**8)})
 
         for to_address, amount in tx_addr_outs.items():
             tx_outs.append({'address': to_address,
@@ -192,6 +111,63 @@ class CreateTx:
                 'script': mk_op_return_script(op_return_data.encode('utf8')),
                 'value': 0
             })
+
+    @staticmethod
+    def _aggregate_inputs(tx_in_list):
+        tx_ins = {}
+
+        for tx_in in tx_in_list:
+            from_address = tx_in['from_address']
+            tx_ins.setdefault(from_address, {'amount': 0, 'fee': 0})
+            tx_ins[from_address]['amount'] += tx_in['amount']
+            tx_ins[from_address]['fee'] += tx_in['fee']
+
+        return tx_ins
+
+    @staticmethod
+    def _aggregate_outputs(tx_out_list):
+        tx_outs = {}
+
+        for tx_out in tx_out_list:
+            to_address = tx_out['to_address']
+            tx_outs.setdefault(to_address, 0)
+            tx_outs[to_address] += tx_out['amount']
+
+        return tx_outs
+
+
+class CreateRawTxView(CreateTx, View):
+
+    def get(self, request, *args, **kwargs):
+        form = RawTxForm(request.GET)
+        if form.is_valid():
+            # Fetch the data
+            from_address = form.cleaned_data['from_address']
+            to_address = form.cleaned_data['to_address']
+            amount = form.cleaned_data['amount']
+            op_return_data = form.cleaned_data['op_return_data']
+            tx_addr_in = {from_address: {'amount': amount, 'fee': Decimal('1')}}
+            tx_addr_out = {to_address: amount}
+
+            ins = []
+            outs = []
+            try:
+                error_msg = self.prepare_tx(ins, outs, tx_addr_in, tx_addr_out, op_return_data)
+            except:
+                return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
+            else:
+                if error_msg:
+                    return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+
+            # Create the transaction
+            raw_tx = make_raw_tx(ins, outs)
+
+            return JsonResponse({'raw_tx': raw_tx})
+        else:
+            errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
+            response = {'error': errors}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
+
 
 class GeneralTxView(CsrfExemptMixin, CreateTx, View):
     http_method_names = ['post']
@@ -241,28 +217,6 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
             except ValidationError as e:
                 return unicode(e.message) % e.params
 
-    @staticmethod
-    def _aggregate_inputs(tx_in_list):
-        tx_ins = {}
-
-        for tx_in in tx_in_list:
-            from_address = tx_in['from_address']
-            tx_ins.setdefault(from_address, {'amount': 0, 'fee': 0})
-            tx_ins[from_address]['amount'] += tx_in['amount']
-            tx_ins[from_address]['fee'] += tx_in['fee']
-
-        return tx_ins
-
-    @staticmethod
-    def _aggregate_outputs(tx_out_list):
-        tx_outs = {}
-
-        for tx_out in tx_out_list:
-            to_address = tx_out['to_address']
-            tx_outs.setdefault(to_address, 0)
-            tx_outs[to_address] += tx_out['amount']
-
-        return tx_outs
 
     def post(self, request, *args, **kwargs):
         try:
@@ -294,3 +248,35 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
         raw_tx = make_raw_tx(tx_ins, tx_outs)
 
         return JsonResponse({'raw_tx': raw_tx})
+
+
+class SendRawTxView(CsrfExemptMixin, View):
+
+    def post(self, request, *args, **kwargs):
+        raw_tx = request.POST.get('raw_tx', '')
+        try:
+            tx_id = get_rpc_connection().sendrawtransaction(raw_tx)
+            response = {'tx_id': tx_id}
+            return JsonResponse(response)
+        except:
+            logger.error('Invalid transaction: %s', raw_tx, exc_info=True)
+            response = {'error': 'invalid raw transaction'}
+            return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+
+class GetBalanceView(View):
+
+    def get(self, request, address, *args, **kwargs):
+        if request.GET.get('confirmed') == '1':
+            utxos = get_rpc_connection().gettxoutaddress(address, mempool=False)
+        else:
+            utxos = get_rpc_connection().gettxoutaddress(address)
+        balance = balance_from_utxos(utxos)
+        return JsonResponse({'balance': balance})
+
+
+class UtxoView(View):
+
+    def get(self, request, address, *args, **kwargs):
+        utxos = get_rpc_connection().gettxoutaddress(address)
+        return JsonResponse(utxos, safe=False)
