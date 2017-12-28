@@ -207,7 +207,8 @@ class CsrfExemptMixin(object):
 
 
 class GeneralTxExplorerView(GeneralTxView):
-    def fetch_utxo(self, address):
+    @staticmethod
+    def _fetch_utxo(address):
         utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
                                          spent=0)
@@ -216,7 +217,8 @@ class GeneralTxExplorerView(GeneralTxView):
 
 
 class CreateRawTxExplorerView(CreateRawTxView):
-    def fetch_utxo(self, address):
+    @staticmethod
+    def _fetch_utxo(address):
         utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
                                          spent=0)
