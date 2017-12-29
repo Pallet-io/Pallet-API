@@ -195,17 +195,6 @@ class GetAddressOpReturnView(View):
         return JsonResponse(response)
 
 
-class CsrfExemptMixin(object):
-    """
-    Exempts the view from CSRF requirements.
-
-    This should be the left-most mixin of a view.
-    """
-    @method_decorator(csrf_exempt)
-    def dispatch(self, *args, **kwargs):
-        return super(CsrfExemptMixin, self).dispatch(*args, **kwargs)
-
-
 class GeneralTxExplorerView(GeneralTxView):
     @staticmethod
     def _fetch_utxo(address):
