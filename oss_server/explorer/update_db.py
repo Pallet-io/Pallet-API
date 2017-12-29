@@ -306,24 +306,19 @@ class BlockDBUpdater(object):
         )
         try:
             prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash))
-            connection.close()
             txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
-            connection.close()
         except Tx.DoesNotExist:
-            connection.close()
             txin_db.txout = None
         except MultipleObjectsReturned:
-            connection.close()
             block = tx_db.block
             while block:
                 try:
                     prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash), block=block)
                     txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
-                    connection.close()
                     break
                 except Tx.DoesNotExist:
-                    connection.close()
                     block = block.prev_block
+        connection.close()
         self.lock.acquire()
         txin_db_list.append(txin_db)
         self.lock.release()
@@ -332,7 +327,6 @@ class BlockDBUpdater(object):
     def _raw_txout_to_db(self, txout, position, tx_db, txout_db_list):
         self.semaphore.acquire()
         address=Address.objects.get_or_create(address=txout.address)[0]
-        connection.close()
         tx_out_db =TxOut(tx=tx_db,
                          value=txout.value,
                          position=position,
@@ -340,6 +334,7 @@ class BlockDBUpdater(object):
                          address=address,
                          valid=tx_db.valid
                          )
+        connection.close()
         self.lock.acquire()
         txout_db_list.append(tx_out_db)
         self.lock.release()
