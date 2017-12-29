@@ -79,38 +79,11 @@ class GetRawTxView(View):
         return base_tx
 
 
-class CreateTx:
+class CreateTx(object):
 
     @staticmethod
     def _fetch_utxo(address):
         raise NotImplementedError
-
-    def prepare_tx(self, tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data):
-        for from_address, amount in tx_addr_ins.items():
-            # Prepare the data for transaction
-            utxos = self._fetch_utxo(from_address)
-            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
-            if not vins:
-                return 'insufficient funds in address {}'.format(from_address)
-
-            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
-
-            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
-
-            if change:
-
-                tx_outs.append({'address': from_address,
-                                'value': int(change * 10**8)})
-
-        for to_address, amount in tx_addr_outs.items():
-            tx_outs.append({'address': to_address,
-                            'value': int(amount * 10**8)})
-
-        if op_return_data:
-            tx_outs.append({
-                'script': mk_op_return_script(op_return_data.encode('utf8')),
-                'value': 0
-            })
 
     @staticmethod
     def _aggregate_inputs(tx_in_list):
@@ -134,6 +107,29 @@ class CreateTx:
             tx_outs[to_address] += tx_out['amount']
 
         return tx_outs
+
+    def prepare_tx(self, tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data):
+        for from_address, amount in tx_addr_ins.items():
+            # Prepare the data for transaction
+            utxos = self._fetch_utxo(from_address)
+            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
+            if not vins:
+                return 'insufficient funds in address {}'.format(from_address)
+            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
+            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
+            if change:
+                tx_outs.append({'address': from_address,
+                                'value': int(change * 10**8)})
+
+        for to_address, amount in tx_addr_outs.items():
+            tx_outs.append({'address': to_address,
+                            'value': int(amount * 10**8)})
+
+        if op_return_data:
+            tx_outs.append({
+                'script': mk_op_return_script(op_return_data.encode('utf8')),
+                'value': 0
+            })
 
 
 class CreateRawTxView(CreateTx, View):
@@ -207,7 +203,6 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
                 amount_validator(tx_in['fee'], min_value=0, max_value=10**10, decimal_places=8)
             except ValidationError as e:
                 return unicode(e.message) % e.params
-
 
         # Validation of output
         if len(json_obj['tx_out']) < 1:
