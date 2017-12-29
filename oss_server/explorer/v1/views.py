@@ -313,8 +313,8 @@ class GeneralTxView(CsrfExemptMixin, View):
             tx_ins += [utxo_to_txin(utxo) for utxo in vins]
 
             if change:
-                    tx_outs.append({'address': from_address,
-                                    'value': int(change * 10**8)})
+                tx_outs.append({'address': from_address,
+                                'value': int(change * 10**8)})
 
         for to_address, amount in tx_addr_outs.items():
             tx_outs.append({'address': to_address,
