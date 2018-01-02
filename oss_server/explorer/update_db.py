@@ -61,7 +61,7 @@ class BlockUpdateDaemon(object):
                     # Because of atomic. Orphan DB must be updated when BlockDb of orpahan block are updated.
                     logger.error('Error, it must be None.')
                 orphan_list.append(orphan_db)
-            except Exception as e:
+            except Exception:
                 logger.exception('Error when load orphan state: {}'.format(orphan.orphan_hash))
 
 class BlockDBUpdater(object):
