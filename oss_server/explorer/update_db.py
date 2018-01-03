@@ -1,11 +1,13 @@
 import logging
 import os
+import threading
 from time import sleep
 
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import transaction
 from django.db import connections
+from django.db import connection
 
 from blocktools.block import Block
 from blocktools.blocktools import *
@@ -19,6 +21,9 @@ BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 # Orpahn block
 # { hash_of_parent_block : list_of_orphan_block_object }
 orphan_block = {}
+
+MAX_BULK_CREATE_SIZE = 5000
+MAX_THREAD = 90
 
 def close_old_connections():
     for conn in connections.all():
@@ -56,8 +61,8 @@ class BlockUpdateDaemon(object):
                     # Because of atomic. Orphan DB must be updated when BlockDb of orpahan block are updated.
                     logger.error('Error, it must be None.')
                 orphan_list.append(orphan_db)
-            except Exception as e:
-                logger.exception('Error when load orphan state: {}'.format(e))
+            except Exception:
+                logger.exception('Error when load orphan state: {}'.format(orphan.orphan_hash))
 
 class BlockDBUpdater(object):
 
@@ -65,6 +70,8 @@ class BlockDBUpdater(object):
         self.blk_dir = blk_dir
         self.batch_num = batch_num
         self.blocks_hash_cache = []
+        self.lock = threading.Lock()
+        self.semaphore = threading.Semaphore(MAX_THREAD)
 
     def update(self):
         # Read the blk file (possibly from last read position) as many as possible, and check if
@@ -210,52 +217,88 @@ class BlockDBUpdater(object):
             # Try to update orphan block
             self._orphan_to_db(block_db)
 
-        for tx in block.Txs:
-            self._raw_tx_to_db(tx, block_db)
+        self._raw_txs_to_db(block.Txs, block_db)
+
+    # Try to save orphan block as more as possible by BFS.
+    @staticmethod
+    def _orphan_to_db(parent_db):
+        block_stack = [parent_db]
+        while block_stack:
+            parent_db = block_stack.pop()
+            orphan_list = orphan_block.get(parent_db.hash, {})
+            for orphan_db in orphan_list:
+                try:
+                    orphan_db.prev_block = parent_db
+                    orphan_db.height = parent_db.height + 1
+                    orphan_db.chain_work = parent_db.chain_work + 1
+                    orphan_db.save()
+                    logger.info("Orphan block update: {}".format(orphan_db.hash))
+
+                    tx_list = Tx.objects.filter(block=orphan_db)
+                    tx_list.update(valid=1)
+
+                    for tx_db in tx_list:
+                        TxOut.objects.filter(tx=tx_db).update(valid=1)
+
+                    orphan_block[parent_db.hash].remove(orphan_db)
+                    if not orphan_block[parent_db.hash]:
+                        del orphan_block[parent_db.hash]
+
+                except Exception as e:
+                    logger.error("Fail to fetch orphan block.{}".format(e))
+
+                block_stack.append(orphan_db)
 
 
-    # Try to save orphan block.
-    def _orphan_to_db(self, parent_db):
-        orphan_list = orphan_block.get(parent_db.hash, {})
-        for orphan_db in orphan_list:
-            try:
-                orphan_db.prev_block = parent_db
-                orphan_db.height = parent_db.height + 1
-                orphan_db.chain_work = parent_db.chain_work + 1
-                orphan_db.save()
-                logger.info("Orphan block update: {}".format(orphan_db.hash))
+    def _raw_txs_to_db(self, tx_list, block_db):
+        txin_db_list = []
+        txout_db_list = []
+        threads_txout_list= []
+        threads_txin_list= []
+        txin_cnt = 0
+        txout_cnt = 0
+        for tx in tx_list:
+            tx_db = Tx.objects.create(hash=tx.txHash,
+                                      block=block_db,
+                                      version=tx.version,
+                                      locktime=tx.lockTime,
+                                      size=tx.size,
+                                      time=block_db.time,
+                                      valid=1 if block_db.prev_block else 0
+                                      )
 
-                tx_list = Tx.objects.filter(block=orphan_db)
-                tx_list.update(valid=1)
-                for tx_db in tx_list:
-                    TxOut.objects.filter(tx=tx_db).update(valid=1)
+            for i in range(tx.outCount):
+                thread_txout = threading.Thread(target=self._raw_txout_to_db, args=(tx.outputs[i], i, tx_db, txout_db_list), name='thread-out-' + str(txout_cnt))
+                threads_txout_list.append(thread_txout)
+                txout_cnt += 1
 
-                orphan_block[parent_db.hash].remove(orphan_db)
-                if not orphan_block[parent_db.hash]:
-                    del orphan_block[parent_db.hash]
 
-                # Recursive store orphan to db
-                self._orphan_to_db(orphan_db)
+            for txin in tx.inputs:
+                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
+                threads_txin_list.append(thread_txin)
+                txin_cnt += 1
 
-            except Exception as e:
-                logger.error("Fail to fetch orphan block.")
+        for thread in threads_txout_list:
+            thread.start()
+        for thread in threads_txout_list:
+            thread.join()
+        while MAX_BULK_CREATE_SIZE < len(txout_db_list):
+            TxOut.objects.bulk_create(txout_db_list[:MAX_BULK_CREATE_SIZE-1])
+            txout_db_list=txout_db_list[MAX_BULK_CREATE_SIZE:]
+        TxOut.objects.bulk_create(txout_db_list)
 
-    def _raw_tx_to_db(self, tx, block_db):
-        tx_db = Tx.objects.create(hash=tx.txHash,
-                                  block=block_db,
-                                  version=tx.version,
-                                  locktime=tx.lockTime,
-                                  size=tx.size,
-                                  time=block_db.time,
-                                  valid=1 if block_db.prev_block else 0
-                                  )
+        for thread in threads_txin_list:
+            thread.start()
+        for thread in threads_txin_list:
+            thread.join()
 
-        for txin in tx.inputs:
-            self._raw_txin_to_db(txin, tx_db)
-        for i in range(tx.outCount):
-            self._raw_txout_to_db(tx.outputs[i], i, tx_db)
+        while MAX_BULK_CREATE_SIZE < len(txin_db_list):
+            TxIn.objects.bulk_create(txin_db_list[:MAX_BULK_CREATE_SIZE-1])
+            txin_db_list=txin_db_list[MAX_BULK_CREATE_SIZE:]
+        TxIn.objects.bulk_create(txin_db_list)
 
-    def _raw_txin_to_db(self, txin, tx_db):
+    def _raw_txin_to_db(self, txin, tx_db, txin_db_list):
+        self.semaphore.acquire()
         txin_db = TxIn(
             tx=tx_db,
             scriptsig=txin.scriptSig,
@@ -275,17 +318,27 @@ class BlockDBUpdater(object):
                     break
                 except Tx.DoesNotExist:
                     block = block.prev_block
+        connection.close()
+        self.lock.acquire()
+        txin_db_list.append(txin_db)
+        self.lock.release()
+        self.semaphore.release()
 
-        txin_db.save()
-
-    def _raw_txout_to_db(self, txout, position, tx_db):
-        TxOut.objects.create(tx=tx_db,
-                             value=txout.value,
-                             position=position,
-                             scriptpubkey=txout.pubkey,
-                             address=Address.objects.get_or_create(address=txout.address)[0],
-                             valid=tx_db.valid
-                             )
+    def _raw_txout_to_db(self, txout, position, tx_db, txout_db_list):
+        self.semaphore.acquire()
+        address=Address.objects.get_or_create(address=txout.address)[0]
+        tx_out_db =TxOut(tx=tx_db,
+                         value=txout.value,
+                         position=position,
+                         scriptpubkey=txout.pubkey,
+                         address=address,
+                         valid=tx_db.valid
+                         )
+        connection.close()
+        self.lock.acquire()
+        txout_db_list.append(tx_out_db)
+        self.lock.release()
+        self.semaphore.release()
 
     def _get_or_create_datadir(self):
         """
