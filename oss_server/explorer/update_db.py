@@ -219,8 +219,9 @@ class BlockDBUpdater(object):
 
         self._raw_txs_to_db(block.Txs, block_db)
 
-    # Try to save orphan block.
-    def _orphan_to_db(self, parent_db):
+    # Try to save orphan block as more as possible by BFS.
+    @staticmethod
+    def _orphan_to_db(parent_db):
         block_stack = [parent_db]
         while block_stack:
             parent_db = block_stack.pop()
@@ -246,15 +247,14 @@ class BlockDBUpdater(object):
                 except Exception as e:
                     logger.error("Fail to fetch orphan block.{}".format(e))
 
-                # Recursive store orphan to db
                 block_stack.append(orphan_db)
 
 
     def _raw_txs_to_db(self, tx_list, block_db):
         txin_db_list = []
         txout_db_list = []
-        threads_txout_list=[]
-        threads_txin_list=[]
+        threads_txout_list= []
+        threads_txin_list= []
         txin_cnt = 0
         txout_cnt = 0
         for tx in tx_list:
@@ -268,13 +268,13 @@ class BlockDBUpdater(object):
                                       )
 
             for i in range(tx.outCount):
-                thread_txout =  threading.Thread(target = self._raw_txout_to_db, args=(tx.outputs[i], i, tx_db, txout_db_list), name = 'thread-out-' + str(txout_cnt))
+                thread_txout = threading.Thread(target=self._raw_txout_to_db, args=(tx.outputs[i], i, tx_db, txout_db_list), name='thread-out-' + str(txout_cnt))
                 threads_txout_list.append(thread_txout)
                 txout_cnt += 1
 
 
             for txin in tx.inputs:
-                thread_txin = threading.Thread(target = self._raw_txin_to_db, args=(txin, tx_db, txin_db_list), name = 'thread-in-' + str(txin_cnt))
+                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
                 threads_txin_list.append(thread_txin)
                 txin_cnt += 1
 
