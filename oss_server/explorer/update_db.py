@@ -118,8 +118,8 @@ class BlockDBUpdater(object):
 
     def _update_txout_spent(self):
         txout_with_txin = TxOut.objects.filter(tx_in__tx__block__hash__in=self.blocks_hash_cache)
-        txout_with_txin.filter(tx_in__tx__block__in_longest=0).update(spent=0)
-        txout_with_txin.filter(tx_in__tx__block__in_longest=1).update(spent=1)
+        txout_with_txin.filter(tx_in__tx__block__in_longest=0).update(spent=False)
+        txout_with_txin.filter(tx_in__tx__block__in_longest=1).update(spent=True)
 
     def _parse_raw_block_to_db(self, file_path, file_offset):
         try:
@@ -235,10 +235,10 @@ class BlockDBUpdater(object):
                     logger.info("Orphan block update: {}".format(orphan_db.hash))
 
                     tx_list = Tx.objects.filter(block=orphan_db)
-                    tx_list.update(valid=1)
+                    tx_list.update(valid=True)
 
                     for tx_db in tx_list:
-                        TxOut.objects.filter(tx=tx_db).update(valid=1)
+                        TxOut.objects.filter(tx=tx_db).update(valid=True)
 
                     orphan_block[parent_db.hash].remove(orphan_db)
                     if not orphan_block[parent_db.hash]:
@@ -264,7 +264,7 @@ class BlockDBUpdater(object):
                                       locktime=tx.lockTime,
                                       size=tx.size,
                                       time=block_db.time,
-                                      valid=1 if block_db.prev_block else 0
+                                      valid=True if block_db.prev_block else False
                                       )
 
             for i in range(tx.outCount):
