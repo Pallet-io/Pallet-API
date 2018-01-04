@@ -72,7 +72,7 @@ class Migration(migrations.Migration):
                 ('size', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('time', models.DecimalField(blank=True, db_index=True, decimal_places=0, max_digits=20, null=True)),
                 ('block', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='txs', related_query_name='tx', to='explorer.Block')),
-                ('valid', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
+                ('valid', models.BooleanField(blank=True, null=True)),
             ],
         ),
         migrations.CreateModel(
@@ -91,10 +91,10 @@ class Migration(migrations.Migration):
                 ('value', models.DecimalField(decimal_places=0, max_digits=30)),
                 ('position', models.DecimalField(decimal_places=0, max_digits=10)),
                 ('scriptpubkey', models.BinaryField(blank=True, null=True)),
-                ('spent', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
+                ('spent', models.BooleanField(blank=True, null=True)),
                 ('address', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_outs', related_query_name='tx_out', to='explorer.Address')),
                 ('tx', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_outs', related_query_name='tx_out', to='explorer.Tx')),
-                ('valid', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
+                ('valid', models.BooleanField(blank=True, null=True)),
             ],
         ),
         migrations.AddField(
