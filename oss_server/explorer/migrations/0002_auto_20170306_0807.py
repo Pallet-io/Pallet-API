@@ -8,7 +8,7 @@ from django.db import migrations, models
 def update_txout_spent(apps, schema_editor):
     TxOut = apps.get_model("explorer", "TxOut")
     db_alias = schema_editor.connection.alias
-    TxOut.objects.using(db_alias).all().update(spent=0)
+    TxOut.objects.using(db_alias).all().update(spent=False)
     TxOut.objects.using(db_alias).filter(tx_in__tx__block__in_longest=1)
 
 
@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='txout',
             name='spent',
-            field=models.DecimalField(decimal_places=0, default=0, max_digits=1),
+            field=models.BooleanField(default=False),
         ),
         migrations.RunPython(update_txout_spent),
     ]

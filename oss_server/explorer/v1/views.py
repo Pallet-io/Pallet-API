@@ -108,7 +108,7 @@ class GetBlockByHeightView(View):
 class GetTxByHashView(View):
     def get(self, request, tx_hash):
         try:
-            response = {'tx': Tx.objects.get(hash=tx_hash, block__in_longest=1, valid=1).as_dict()}
+            response = {'tx': Tx.objects.get(hash=tx_hash, block__in_longest=1, valid=True).as_dict()}
             return JsonResponse(response)
         except Tx.DoesNotExist:
             response = {'error': 'tx not exist'}
@@ -127,7 +127,7 @@ class GetAddressTxsView(View):
             # tx should be in main chain, and distinct() prevents duplicate object
             Q1 = Q(tx_in__txout__address__address=address)
             Q2 = Q(tx_out__address__address=address)
-            tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1, valid=1).distinct()
+            tx_list = Tx.objects.filter(Q1 | Q2, block__in_longest=1, valid=True).distinct()
 
             if since is not None:
                 tx_list = tx_list.filter(time__gte=since)
@@ -163,8 +163,8 @@ class GetAddressBalanceView(View):
     def get(self, request, address):
         utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
-                                         spent=0,
-                                         valid=1)
+                                         spent=False,
+                                         valid=True)
 
         balance = 0
         for utxo in utxo_list:
@@ -177,8 +177,8 @@ class GetAddressUtxoView(View):
     def get(self, request, address):
         utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=address,
-                                         spent=0,
-                                         valid=1)
+                                         spent=False,
+                                         valid=True)
 
         response = {'utxo': [utxo.utxo_dict() for utxo in utxo_list]}
         return JsonResponse(response)
@@ -187,7 +187,7 @@ class GetAddressUtxoView(View):
 class GetAddressOpReturnView(View):
     def get(self, request, address):
         # choose all tx outs if other tx outs in the same tx are related to this address
-        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address, valid=1)
+        tx_out_list = TxOut.objects.filter(tx__tx_out__address__address=address, valid=True)
         op_return_out = [out.op_return_dict() for out in tx_out_list if out.is_op_return]
 
         response = {'txout': op_return_out}
@@ -273,8 +273,8 @@ class GeneralTxView(CsrfExemptMixin, View):
         for from_address, amount in tx_info_ins.items():
             utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                              address__address=from_address,
-                                             spent=0,
-                                             valid=1)
+                                             spent=False,
+                                             valid=True)
             utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
             vins = select_utxo(utxos=utxos, sum=amount)
             if not vins:
@@ -300,8 +300,8 @@ class GeneralTxView(CsrfExemptMixin, View):
         if not fee_included:
             utxos = TxOut.objects.filter(tx__block__in_longest=1,
                                          address__address=fee_address,
-                                         spent=0,
-                                         valid=1)
+                                         spent=False,
+                                         valid=True)
             utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
             vins = select_utxo(utxos=utxos, sum=amount)
             if not vins:
@@ -343,8 +343,8 @@ class CreateRawTxView(View):
 
             utxo_list = TxOut.objects.filter(tx__block__in_longest=1,
                                              address__address=from_address,
-                                             spent=0,
-                                             valid=1)
+                                             spent=False,
+                                             valid=True)
             utxos = [utxo.utxo_as_vin_dict() for utxo in utxo_list]
             inputs = select_utxo(utxos, amount + 1)
             if not inputs:

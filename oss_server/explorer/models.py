@@ -106,7 +106,7 @@ class Tx(models.Model):
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     size = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     time = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True, db_index=True)
-    valid = models.DecimalField(max_digits=1, decimal_places=0, default=0)
+    valid = models.BooleanField(default=False)
 
     def as_dict(self):
         return OrderedDict([
@@ -130,8 +130,8 @@ class TxOut(models.Model):
     position = models.DecimalField(max_digits=10, decimal_places=0)
     scriptpubkey = models.BinaryField(blank=True, null=True)
     address = models.ForeignKey(Address, related_name='tx_outs', related_query_name='tx_out')
-    spent = models.DecimalField(max_digits=1, decimal_places=0, default=0)
-    valid = models.DecimalField(max_digits=1, decimal_places=0, default=0)
+    spent = models.BooleanField(default=False)
+    valid = models.BooleanField(default=False)
 
     @property
     def is_op_return(self):
