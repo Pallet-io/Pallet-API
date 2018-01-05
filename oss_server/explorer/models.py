@@ -183,6 +183,16 @@ class TxIn(models.Model):
             ('amount', int(self.txout.value) if self.txout else None),
             ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
+            ('witness', [witness.as_dict() for witness in self.witnessess.all()])
+        ])
+
+class Witness(models.Model):
+    txin = models.ForeignKey(TxIn, related_name='witnesses', related_query_name='witness')
+    scriptsig = models.BinaryField(blank=True, null=True)
+
+    def as_dict(self):
+        return OrderedDict([
+            ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
         ])
 
 class Orphan(models.Model):
