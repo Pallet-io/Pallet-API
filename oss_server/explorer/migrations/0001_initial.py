@@ -86,6 +86,14 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
+            name='Witness',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('scriptsig', models.BinaryField(blank=True, null=True)),
+                ('txin', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='witnessess', related_query_name='witness', to='explorer.TxIn')),
+            ],
+        ),
+        migrations.CreateModel(
             name='TxOut',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),

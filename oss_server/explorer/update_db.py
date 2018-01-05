@@ -12,7 +12,7 @@ from django.db import connection
 from blocktools.block import Block
 from blocktools.blocktools import *
 
-from .models import Address, Datadir, Tx, TxIn, TxOut, Orphan
+from .models import Address, Datadir, Tx, TxIn, TxOut, Orphan, Witness
 from .models import Block as BlockDb
 
 logger = logging.getLogger(__name__)
@@ -253,6 +253,7 @@ class BlockDBUpdater(object):
     def _raw_txs_to_db(self, tx_list, block_db):
         txin_db_list = []
         txout_db_list = []
+        witness_db_list = []
         threads_txout_list= []
         threads_txin_list= []
         txin_cnt = 0
@@ -273,7 +274,7 @@ class BlockDBUpdater(object):
                 txout_cnt += 1
 
             for i, txin in enumerate(tx.inputs):
-                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, i, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
+                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, i, tx_db, txin_db_list, witness_db_list), name='thread-in-' + str(txin_cnt))
                 threads_txin_list.append(thread_txin)
                 txin_cnt += 1
 
@@ -296,7 +297,13 @@ class BlockDBUpdater(object):
             txin_db_list=txin_db_list[MAX_BULK_CREATE_SIZE:]
         TxIn.objects.bulk_create(txin_db_list)
 
-    def _raw_txin_to_db(self, txin, position, tx_db, txin_db_list):
+        if witness_db_list:
+            while MAX_BULK_CREATE_SIZE < len(witness_db_list):
+                Witness.objects.bulk_create(witness_db_list[:MAX_BULK_CREATE_SIZE-1])
+                witness_db_list=witness_db_list[MAX_BULK_CREATE_SIZE:]
+            Witness.objects.bulk_create(witness_db_list)
+
+    def _raw_txin_to_db(self, txin, position, tx_db, txin_db_list, witness_db_list):
         self.semaphore.acquire()
         txin_db = TxIn(
             tx=tx_db,
@@ -321,6 +328,9 @@ class BlockDBUpdater(object):
         connection.close()
         self.lock.acquire()
         txin_db_list.append(txin_db)
+        if txin.witnessCount > 0:
+            for witness in txin.witnesses:
+                self._raw_witness_to_db(witness, txin_db, witness_db_list)
         self.lock.release()
         self.semaphore.release()
 
@@ -339,6 +349,10 @@ class BlockDBUpdater(object):
         txout_db_list.append(tx_out_db)
         self.lock.release()
         self.semaphore.release()
+
+    @staticmethod
+    def _raw_witness_to_db(witness, txin_db, witness_db_list):
+        witness_db_list.append(Witness(txin=txin_db, scriptsig=witness.scriptSig))
 
     def _get_or_create_datadir(self):
         """
