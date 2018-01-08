@@ -82,6 +82,7 @@ class Migration(migrations.Migration):
                 ('scriptsig', models.BinaryField(blank=True, null=True)),
                 ('sequence', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('tx', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_ins', related_query_name='tx_in', to='explorer.Tx')),
+                ('position', models.DecimalField(decimal_places=0, max_digits=10)),
             ],
         ),
         migrations.CreateModel(
