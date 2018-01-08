@@ -116,8 +116,8 @@ class Tx(models.Model):
             ('locktime', int(self.locktime)),
             ('time', int(self.time)),
             ('confirmations', self.block.confirmation),
-            ('vins', [vin.as_dict() for vin in self.tx_ins.all()]),
-            ('vouts', [vout.as_dict() for vout in self.tx_outs.all()]),
+            ('vins', [vin.as_dict() for vin in self.tx_ins.all().order_by('position')]),
+            ('vouts', [vout.as_dict() for vout in self.tx_outs.all().order_by('position')]),
         ])
 
     def __str__(self):
@@ -173,6 +173,7 @@ class TxIn(models.Model):
     txout = models.ForeignKey(TxOut, related_name='tx_ins', related_query_name='tx_in', blank=True, null=True)
     scriptsig = models.BinaryField(blank=True, null=True)
     sequence = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
+    position = models.DecimalField(max_digits=10, decimal_places=0)
 
     def as_dict(self):
         return OrderedDict([
