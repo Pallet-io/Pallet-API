@@ -272,9 +272,8 @@ class BlockDBUpdater(object):
                 threads_txout_list.append(thread_txout)
                 txout_cnt += 1
 
-
-            for i in range(len(tx.inputs)):
-                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(tx.inputs[i], i, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
+            for i, txin in enumerate(tx.inputs):
+                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, i, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
                 threads_txin_list.append(thread_txin)
                 txin_cnt += 1
 
