@@ -81,6 +81,11 @@ class GetRawTxView(View):
 
 class CreateRawTxView(View):
 
+    @staticmethod
+    def _fetch_utxo(address):
+        utxos = get_rpc_connection().gettxoutaddress(address)
+        return utxos
+
     def get(self, request, *args, **kwargs):
         form = RawTxForm(request.GET)
         if form.is_valid():
@@ -89,7 +94,7 @@ class CreateRawTxView(View):
             amount = form.cleaned_data['amount']
             op_return_data = form.cleaned_data['op_return_data']
 
-            utxos = get_rpc_connection().gettxoutaddress(from_address)
+            utxos = self._fetch_utxo(from_address)
             inputs = select_utxo(utxos, amount + 1)
             if not inputs:
                 return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
@@ -222,6 +227,11 @@ class GeneralTxView(CsrfExemptMixin, View):
 
         return tx_outs
 
+    @staticmethod
+    def _fetch_utxo(address):
+        utxos = get_rpc_connection().gettxoutaddress(address)
+        return utxos
+
     def post(self, request, *args, **kwargs):
         try:
             json_obj = json.loads(request.body, parse_int=Decimal, parse_float=Decimal)
@@ -240,7 +250,7 @@ class GeneralTxView(CsrfExemptMixin, View):
         tx_outs = []
 
         for from_address, amount in tx_addr_ins.items():
-            utxos = get_rpc_connection().gettxoutaddress(from_address)
+            utxos = self._fetch_utxo(from_address)
 
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
@@ -252,8 +262,8 @@ class GeneralTxView(CsrfExemptMixin, View):
             tx_ins += [utxo_to_txin(utxo) for utxo in vins]
 
             if change:
-                    tx_outs.append({'address': from_address,
-                                    'value': int(change * 10**8)})
+                tx_outs.append({'address': from_address,
+                                'value': int(change * 10**8)})
 
         for to_address, amount in tx_addr_outs.items():
             tx_outs.append({'address': to_address,
