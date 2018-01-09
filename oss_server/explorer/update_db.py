@@ -272,9 +272,8 @@ class BlockDBUpdater(object):
                 threads_txout_list.append(thread_txout)
                 txout_cnt += 1
 
-
-            for txin in tx.inputs:
-                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
+            for i, txin in enumerate(tx.inputs):
+                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, i, tx_db, txin_db_list), name='thread-in-' + str(txin_cnt))
                 threads_txin_list.append(thread_txin)
                 txin_cnt += 1
 
@@ -297,12 +296,13 @@ class BlockDBUpdater(object):
             txin_db_list=txin_db_list[MAX_BULK_CREATE_SIZE:]
         TxIn.objects.bulk_create(txin_db_list)
 
-    def _raw_txin_to_db(self, txin, tx_db, txin_db_list):
+    def _raw_txin_to_db(self, txin, position, tx_db, txin_db_list):
         self.semaphore.acquire()
         txin_db = TxIn(
             tx=tx_db,
             scriptsig=txin.scriptSig,
-            sequence=txin.seqNo
+            sequence=txin.seqNo,
+            position=position
         )
         try:
             prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash))
