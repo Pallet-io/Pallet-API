@@ -144,6 +144,10 @@ class Tx:
         self.version = uint4(blockchain)
         self.inCount = varint(blockchain)
         self.inputs = []
+        witness_flag = 0
+        if self.inCount == 0:
+            witness_flag = varint(blockchain)
+            self.inCount = varint(blockchain)
         for i in range(0, self.inCount):
             input = txInput(blockchain)
             self.inputs.append(input)
@@ -153,6 +157,9 @@ class Tx:
             for i in range(0, self.outCount):
                 output = txOutput(blockchain)
                 self.outputs.append(output)
+        if not witness_flag == 0:
+            for i in range(0, self.inCount):
+                self.inputs[i].parse_witness(blockchain)
         self.lockTime = uint4(blockchain)
         self.size = blockchain.tell() - txStart
 
@@ -204,6 +211,8 @@ class txInput:
         self.scriptLen = varint(blockchain)
         self.scriptSig = blockchain.read(self.scriptLen)
         self.seqNo = uint4(blockchain)
+        self.witnessCount = 0
+        self.witnesses = []
 
     def toString(self):
         print "--------------TX IN------------------------"
@@ -212,6 +221,9 @@ class txInput:
         print "Script Length:\t %d" % self.scriptLen
         print "Script Sig:\t %s" % hashStr(self.scriptSig)
         print "Sequence:\t %8x" % self.seqNo
+        print "Size of Witness stack:\t %8x" % self.witnessCount
+        for w in self.witnesses:
+            w.toString()
         print "--------------------------------------------"
 
     def toDict(self):
@@ -223,7 +235,15 @@ class txInput:
             'script': hashStr(self.scriptSig),
             'sequence': self.seqNo
         }
+        for witness in self.witnesses:
+            txDict['witness'].append(witness.toDict())
         return dict_
+
+    def parse_witness(self, blockchain):
+        self.witnessCount = varint(blockchain)
+        for i in range(0, self.witnessCount):
+            witness = Witness(blockchain)
+            self.witnesses.append(witness)
 
 
 class txOutput:
@@ -249,5 +269,24 @@ class txOutput:
         dict_ = {
             'script': hashStr(self.pubkey),
             'value': self.value
+        }
+        return dict_
+
+
+class Witness:
+
+    def __init__(self, blockchain):
+        self.scriptLen = varint(blockchain)
+        self.scriptSig = blockchain.read(self.scriptLen)
+
+    def toString(self):
+        print "--------------WITNESS-----------------------"
+        print "Script Length:\t %d" % self.scriptLen
+        print "Script Sig:\t %s" % hashStr(self.scriptSig)
+        print "--------------------------------------------"
+
+    def toDict(self):
+        dict_ = {
+            'script': hashStr(self.scriptSig),
         }
         return dict_
