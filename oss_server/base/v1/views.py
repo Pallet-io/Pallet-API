@@ -14,7 +14,7 @@ from gcoin import (make_raw_tx, mk_op_return_script)
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from oss_server.utils import address_validator, amount_validator
+from oss_server.utils import address_validator, amount_validator, json_validator
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
 from .forms import RawTxForm
@@ -171,6 +171,7 @@ class CreateRawTxView(CreateTx, View):
 
 
 class GeneralTxView(CsrfExemptMixin, CreateTx, View):
+
     http_method_names = ['post']
 
     @staticmethod
@@ -180,58 +181,40 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
 
     @staticmethod
     def _validate_json_obj(json_obj):
-        # Validation of input
-        if len(json_obj['tx_in']) < 1:
-            return '`tx_in` is required'
-        tx_in_key_set = {'from_address', 'amount'}
-        for tx_in in json_obj['tx_in']:
-            if not tx_in_key_set <= set(tx_in.keys()):
-                return 'objects in `tx_in` should contain keys `from_address`, `amount`'
-            try:
+        try:
+            err_name = 'json'
+            required_fields = {'tx_in', 'tx_out'}
+            required_keys = {
+                'tx_in': {'from_address', 'amount'},
+                'tx_out': {'to_address', 'amount'},
+            }
+            json_validator(json_obj, required_fields)
+            # Validation of input
+            err_name = 'tx_in'
+            for tx_in in json_obj['tx_in']:
+                json_validator(tx_in, required_keys['tx_in'])
                 address_validator(tx_in['from_address'])
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-            tx_in['amount'] = Decimal(tx_in['amount'])
-            try:
+                tx_in['amount'] = Decimal(tx_in['amount'])
                 amount_validator(tx_in['amount'], min_value=0, max_value=10**10, decimal_places=8)
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-            tx_in['fee'] = Decimal(tx_in['fee'])
-            try:
+                tx_in['fee'] = Decimal(tx_in['fee'])
                 amount_validator(tx_in['fee'], min_value=0, max_value=10**10, decimal_places=8)
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-        # Validation of output
-        if len(json_obj['tx_out']) < 1:
-            return '`tx_out` is required'
-        tx_out_key_set = {'to_address', 'amount'}
-        for tx_out in json_obj['tx_out']:
-            if not tx_out_key_set <= set(tx_out.keys()):
-                return 'objects in `tx_out` should contain keys `to_address`, `amount`'
-            try:
+            # Validation of output
+            err_name = 'tx_out'
+            for tx_out in json_obj['tx_out']:
+                json_validator(tx_out, required_keys['tx_out'])
                 address_validator(tx_out['to_address'])
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-            tx_out['amount'] = Decimal(tx_out['amount'])
-            try:
+                tx_out['amount'] = Decimal(tx_out['amount'])
                 amount_validator(tx_out['amount'], min_value=0, max_value=10**10, decimal_places=8)
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
+        except ValidationError as e:
+            e.params['name'] = err_name
+            raise e
 
     def post(self, request, *args, **kwargs):
         try:
             json_obj = json.loads(request.body, parse_int=Decimal, parse_float=Decimal)
-            error_msg = self._validate_json_obj(json_obj)
-        except:
-            return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
-        else:
-            if error_msg:
-                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
+            self._validate_json_obj(json_obj)
+        except ValidationError as e:
+            return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
 
         # Fetch the data
         op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
