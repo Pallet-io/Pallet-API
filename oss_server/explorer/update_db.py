@@ -1,13 +1,11 @@
 import logging
 import os
-import threading
 from time import sleep
 
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import transaction
 from django.db import connections
-from django.db import connection
 
 from blocktools.block import Block
 from blocktools.blocktools import *
@@ -70,8 +68,6 @@ class BlockDBUpdater(object):
         self.blk_dir = blk_dir
         self.batch_num = batch_num
         self.blocks_hash_cache = []
-        self.lock = threading.Lock()
-        self.semaphore = threading.Semaphore(MAX_THREAD)
 
     def update(self):
         # Read the blk file (possibly from last read position) as many as possible, and check if
@@ -251,13 +247,6 @@ class BlockDBUpdater(object):
 
 
     def _raw_txs_to_db(self, tx_list, block_db):
-        txin_db_list = []
-        txout_db_list = []
-        witness_db_list = []
-        threads_txout_list= []
-        threads_txin_list= []
-        txin_cnt = 0
-        txout_cnt = 0
         for tx in tx_list:
             tx_db = Tx.objects.create(hash=tx.txHash,
                                       block=block_db,
@@ -269,42 +258,12 @@ class BlockDBUpdater(object):
                                       )
 
             for i in range(tx.outCount):
-                thread_txout = threading.Thread(target=self._raw_txout_to_db, args=(tx.outputs[i], i, tx_db, txout_db_list), name='thread-out-' + str(txout_cnt))
-                threads_txout_list.append(thread_txout)
-                txout_cnt += 1
+                self._raw_txout_to_db(tx.outputs[i], i, tx_db)
 
             for i, txin in enumerate(tx.inputs):
-                thread_txin = threading.Thread(target=self._raw_txin_to_db, args=(txin, i, tx_db, txin_db_list, witness_db_list), name='thread-in-' + str(txin_cnt))
-                threads_txin_list.append(thread_txin)
-                txin_cnt += 1
+                self._raw_txin_to_db(txin, i, tx_db)
 
-        for thread in threads_txout_list:
-            thread.start()
-        for thread in threads_txout_list:
-            thread.join()
-        while MAX_BULK_CREATE_SIZE < len(txout_db_list):
-            TxOut.objects.bulk_create(txout_db_list[:MAX_BULK_CREATE_SIZE-1])
-            txout_db_list=txout_db_list[MAX_BULK_CREATE_SIZE:]
-        TxOut.objects.bulk_create(txout_db_list)
-
-        for thread in threads_txin_list:
-            thread.start()
-        for thread in threads_txin_list:
-            thread.join()
-
-        while MAX_BULK_CREATE_SIZE < len(txin_db_list):
-            TxIn.objects.bulk_create(txin_db_list[:MAX_BULK_CREATE_SIZE-1])
-            txin_db_list=txin_db_list[MAX_BULK_CREATE_SIZE:]
-        TxIn.objects.bulk_create(txin_db_list)
-
-        if witness_db_list:
-            while MAX_BULK_CREATE_SIZE < len(witness_db_list):
-                Witness.objects.bulk_create(witness_db_list[:MAX_BULK_CREATE_SIZE-1])
-                witness_db_list=witness_db_list[MAX_BULK_CREATE_SIZE:]
-            Witness.objects.bulk_create(witness_db_list)
-
-    def _raw_txin_to_db(self, txin, position, tx_db, txin_db_list, witness_db_list):
-        self.semaphore.acquire()
+    def _raw_txin_to_db(self, txin, position, tx_db):
         txin_db = TxIn(
             tx=tx_db,
             scriptsig=txin.scriptSig,
@@ -325,34 +284,24 @@ class BlockDBUpdater(object):
                     break
                 except Tx.DoesNotExist:
                     block = block.prev_block
-        connection.close()
-        self.lock.acquire()
-        txin_db_list.append(txin_db)
+        txin_db.save()
         if txin.witnessCount > 0:
             for witness in txin.witnesses:
-                self._raw_witness_to_db(witness, txin_db, witness_db_list)
-        self.lock.release()
-        self.semaphore.release()
+                self._raw_witness_to_db(witness, txin_db)
 
-    def _raw_txout_to_db(self, txout, position, tx_db, txout_db_list):
-        self.semaphore.acquire()
+    def _raw_txout_to_db(self, txout, position, tx_db):
         address=Address.objects.get_or_create(address=txout.address)[0]
-        tx_out_db =TxOut(tx=tx_db,
-                         value=txout.value,
-                         position=position,
-                         scriptpubkey=txout.pubkey,
-                         address=address,
-                         valid=tx_db.valid
-                         )
-        connection.close()
-        self.lock.acquire()
-        txout_db_list.append(tx_out_db)
-        self.lock.release()
-        self.semaphore.release()
+        txout_db =TxOut.objects.create(tx=tx_db,
+                                       value=txout.value,
+                                       position=position,
+                                       scriptpubkey=txout.pubkey,
+                                       address=address,
+                                       valid=tx_db.valid
+                                       )
 
     @staticmethod
-    def _raw_witness_to_db(witness, txin_db, witness_db_list):
-        witness_db_list.append(Witness(txin=txin_db, scriptsig=witness.scriptSig))
+    def _raw_witness_to_db(witness, txin_db):
+        Witness.objects.create(txin=txin_db, scriptsig=witness.scriptSig)
 
     def _get_or_create_datadir(self):
         """
