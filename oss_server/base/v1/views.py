@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
+from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 from gcoin import (make_raw_tx, mk_op_return_script)
@@ -15,6 +16,7 @@ from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
 from oss_server.utils import address_validator, amount_validator, json_validator
+from oss_server.exceptions import TransactionError
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
 from .forms import RawTxForm
@@ -114,7 +116,12 @@ class CreateTx(object):
             utxos = self._fetch_utxo(from_address)
             vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
             if not vins:
-                return 'insufficient funds in address {}'.format(from_address)
+                raise TransactionError(
+                    _('insufficient funds in address %(address)s'),
+                    code='invalid',
+                    params={'address': from_address}
+                )
+                return
             change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
             tx_ins += [utxo_to_txin(utxo) for utxo in vins]
             if change:
@@ -153,12 +160,11 @@ class CreateRawTxView(CreateTx, View):
             ins = []
             outs = []
             try:
-                error_msg = self.prepare_tx(ins, outs, tx_addr_in, tx_addr_out, op_return_data)
+                self.prepare_tx(ins, outs, tx_addr_in, tx_addr_out, op_return_data)
+            except TransactionError as e:
+                return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
             except:
                 return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
-            else:
-                if error_msg:
-                    return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
             # Create the transaction
             raw_tx = make_raw_tx(ins, outs)
@@ -225,12 +231,11 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
         tx_outs = []
 
         try:
-            error_msg = self.prepare_tx(tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data)
+            self.prepare_tx(tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data)
+        except TransactionError as e:
+            return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
         except:
             return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
-        else:
-            if error_msg:
-                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
 
         # Create the transaction
         raw_tx = make_raw_tx(tx_ins, tx_outs)
