@@ -50,7 +50,6 @@ class Migration(migrations.Migration):
                 ('orphan_hash', models.CharField(max_length=64, unique=True)),
             ],
         ),
-
         migrations.CreateModel(
             name='Datadir',
             fields=[
@@ -76,24 +75,6 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='TxIn',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('scriptsig', models.BinaryField(blank=True, null=True)),
-                ('sequence', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
-                ('tx', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_ins', related_query_name='tx_in', to='explorer.Tx')),
-                ('position', models.DecimalField(decimal_places=0, max_digits=10)),
-            ],
-        ),
-        migrations.CreateModel(
-            name='Witness',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('scriptsig', models.BinaryField(blank=True, null=True)),
-                ('txin', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='witnessess', related_query_name='witness', to='explorer.TxIn')),
-            ],
-        ),
-        migrations.CreateModel(
             name='TxOut',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -106,9 +87,23 @@ class Migration(migrations.Migration):
                 ('valid', models.BooleanField(blank=True, null=True)),
             ],
         ),
-        migrations.AddField(
-            model_name='txin',
-            name='txout',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='tx_ins', related_query_name='tx_in', to='explorer.TxOut'),
+        migrations.CreateModel(
+            name='TxIn',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('scriptsig', models.BinaryField(blank=True, null=True)),
+                ('sequence', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
+                ('tx', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tx_ins', related_query_name='tx_in', to='explorer.Tx')),
+                ('position', models.DecimalField(decimal_places=0, max_digits=10)),
+                ('txout', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='tx_ins', related_query_name='tx_in', to='explorer.TxOut')),
+            ],
+        ),
+        migrations.CreateModel(
+            name='Witness',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('scriptsig', models.BinaryField(blank=True, null=True)),
+                ('txin', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='witnessess', related_query_name='witness', to='explorer.TxIn')),
+            ],
         ),
     ]
