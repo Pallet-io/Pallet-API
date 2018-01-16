@@ -5,13 +5,7 @@ import json
 from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.views.generic import View
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from django.core.exceptions import ValidationError
-from gcoin import make_raw_tx, mk_op_return_script
 
-from oss_server.utils import address_validator, amount_validator
-from base.utils import balance_from_utxos, select_utxo, utxo_to_txin
 from base.v1.forms import RawTxForm
 from base.v1.views import CreateRawTxView, GeneralTxView
 
