@@ -183,7 +183,7 @@ class TxIn(models.Model):
             ('amount', int(self.txout.value) if self.txout else None),
             ('scriptSig', binascii.hexlify(self.scriptsig) if self.scriptsig else None),
             ('sequence', self.sequence),
-            ('witness', [witness.as_dict() for witness in self.witnessess.all()])
+            ('witness', [witness.as_dict() for witness in self.witnesses.all()])
         ])
 
 class Witness(models.Model):
@@ -196,5 +196,11 @@ class Witness(models.Model):
         ])
 
 class Orphan(models.Model):
-    hash = models.CharField(unique=True, max_length=64)
+    hash = models.CharField(max_length=64)
     orphan_hash = models.CharField(unique=True, max_length=64)
+
+class OrphanTxIn(models.Model):
+    hash = models.CharField(max_length=64)
+    tx_hash = models.CharField(max_length=64)
+    position = models.DecimalField(max_digits=10, decimal_places=0)
+    out_index = models.DecimalField(max_digits=10, decimal_places=0)

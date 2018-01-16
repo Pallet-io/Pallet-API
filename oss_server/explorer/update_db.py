@@ -10,7 +10,7 @@ from django.db import connections
 from blocktools.block import Block
 from blocktools.blocktools import *
 
-from .models import Address, Datadir, Tx, TxIn, TxOut, Orphan, Witness
+from .models import Address, Datadir, Tx, TxIn, TxOut, Orphan, Witness, OrphanTxIn
 from .models import Block as BlockDb
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,9 @@ BLK_DIR = settings.BTC_DIR + '/' + BLK_PATH[settings.NET]
 # Orpahn block
 # { hash_of_parent_block : list_of_orphan_block_object }
 orphan_block = {}
+# Orphan txin
+# { hash_of_parent_tx : list_of(orphan_txin_object, outindex) }
+orphan_txin = {}
 
 MAX_BULK_CREATE_SIZE = 5000
 MAX_THREAD = 90
@@ -61,6 +64,16 @@ class BlockUpdateDaemon(object):
                 orphan_list.append(orphan_db)
             except Exception:
                 logger.exception('Error when load orphan state: {}'.format(orphan.orphan_hash))
+
+        for orphan in OrphanTxIn.objects.all():
+            orphan_list = orphan_txin.setdefault(orphan.hash, [])
+            try:
+                txin_db = TxIn.objects.get(hash=orphan.tx_hash, position=orphan.position)
+                if txin_db.txout:
+                    logger.error('Error, it must be None.')
+                orphan_list.append((txin_db, orphan.out_index))
+            except Exception:
+                logger.exception('Error when load orphan txin state: {} {}'.format(orphan.tx_hash, orphan.position))
 
 class BlockDBUpdater(object):
 
@@ -221,7 +234,7 @@ class BlockDBUpdater(object):
         block_stack = [parent_db]
         while block_stack:
             parent_db = block_stack.pop()
-            orphan_list = orphan_block.get(parent_db.hash, {})
+            orphan_list = orphan_block.get(parent_db.hash, [])
             for orphan_db in orphan_list:
                 try:
                     orphan_db.prev_block = parent_db
@@ -270,20 +283,24 @@ class BlockDBUpdater(object):
             sequence=txin.seqNo,
             position=position
         )
-        try:
-            prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash))
-            txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
-        except Tx.DoesNotExist:
+        if hashStr(txin.prevhash) == '0000000000000000000000000000000000000000000000000000000000000000':
             txin_db.txout = None
-        except MultipleObjectsReturned:
-            block = tx_db.block
-            while block:
-                try:
-                    prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash), block=block)
-                    txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
-                    break
-                except Tx.DoesNotExist:
-                    block = block.prev_block
+        else:
+            try:
+                prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash))
+                txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
+            except Tx.DoesNotExist, TxOut.DoesNotExist:
+                orphan_list = orphan_txin.setdefault(hashStr(txin.prevhash), [])
+                orphan_list.append((txin_db, txin.txOutId))
+            except MultipleObjectsReturned:
+                block = tx_db.block
+                while block:
+                    try:
+                        prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash), block=block)
+                        txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
+                        break
+                    except Tx.DoesNotExist:
+                        block = block.prev_block
         txin_db.save()
         if txin.witnessCount > 0:
             for witness in txin.witnesses:
@@ -298,6 +315,17 @@ class BlockDBUpdater(object):
                                        address=address,
                                        valid=tx_db.valid
                                        )
+
+        orphan_list = orphan_txin.get(tx_db.hash, [])
+        for txin_db, index in orphan_list:
+            if index == position:
+                txin_db.txout=txout_db
+                txin_db.save()
+                logger.info('Orphan txin id {} updated!'.format(txin_db.tx.hash))
+                orphan_txin[tx_db.hash].remove((txin_db, index))
+                if not orphan_txin[tx_db.hash]:
+                    del orphan_txin[tx_db.hash]
+                break;
 
     @staticmethod
     def _raw_witness_to_db(witness, txin_db):
@@ -342,9 +370,17 @@ class BlockDBUpdater(object):
         """ To ensure data integrity. """
         # Clean
         Orphan.objects.all().delete()
+        OrphanTxIn.objects.all().delete()
         # Store
         for parent, orphan_list in orphan_block.iteritems():
             for orphan in orphan_list:
                 Orphan.objects.create(hash=parent,
                                       orphan_hash=orphan.hash
                                       )
+        for parent, orphan_list in orphan_txin.iteritems():
+            for orphan, out_index in orphan_list:
+                OrphanTxIn.objects.create(hash=parent,
+                                          tx_hash=orphan.tx.hash,
+                                          position=orphan.position,
+                                          out_index=out_index
+                                          )
