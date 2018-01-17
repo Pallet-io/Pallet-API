@@ -410,7 +410,7 @@ class CreateRawTxTest(TestCase):
                                               'to_address': self.to_address,
                                               'amount': 772})
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'insufficient funds'})
+        self.assertEqual(response.json(), {'error': 'insufficient funds in address {}'.format(self.from_address)})
 
     def test_create_raw_tx_with_amount_exceed_8_decimal_digit(self):
         response = self.client.get(self.url, {'from_address': self.from_address,
@@ -485,7 +485,7 @@ class GeneralTxTest(TestCase):
         }
         response = self.client.post(self.url, json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
+        self.assertEqual(response.json(), {'error': 'tx_in `amount` only allow up to 8 decimal digits'})
 
     def test_missing_form_data(self):
         response = self.client.post(self.url, json.dumps({}), content_type='application/json')

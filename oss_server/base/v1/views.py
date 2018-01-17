@@ -8,13 +8,15 @@ from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
+from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 from gcoin import (make_raw_tx, mk_op_return_script)
 from gcoinrpc import connect_to_remote
 from gcoinrpc.exceptions import InvalidAddressOrKey, InvalidParameter
 
-from oss_server.utils import address_validator, amount_validator
+from oss_server.utils import address_validator, amount_validator, json_validator
+from oss_server.exceptions import TransactionError
 
 from ..utils import balance_from_utxos, select_utxo, utxo_to_txin
 from .forms import RawTxForm
@@ -79,49 +81,166 @@ class GetRawTxView(View):
         return base_tx
 
 
-class CreateRawTxView(View):
+class CreateTx(object):
 
     @staticmethod
     def _fetch_utxo(address):
-        utxos = get_rpc_connection().gettxoutaddress(address)
-        return utxos
+        raise NotImplementedError
+
+    @staticmethod
+    def _aggregate_inputs(tx_in_list):
+        tx_ins = {}
+
+        for tx_in in tx_in_list:
+            from_address = tx_in['from_address']
+            tx_ins.setdefault(from_address, {'amount': 0, 'fee': 0})
+            tx_ins[from_address]['amount'] += tx_in['amount']
+            tx_ins[from_address]['fee'] += tx_in['fee']
+
+        return tx_ins
+
+    @staticmethod
+    def _aggregate_outputs(tx_out_list):
+        tx_outs = {}
+
+        for tx_out in tx_out_list:
+            to_address = tx_out['to_address']
+            tx_outs.setdefault(to_address, 0)
+            tx_outs[to_address] += tx_out['amount']
+
+        return tx_outs
+
+    def prepare_tx(self, tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data):
+        for from_address, amount in tx_addr_ins.items():
+            # Prepare the data for transaction
+            utxos = self._fetch_utxo(from_address)
+            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
+            if not vins:
+                raise TransactionError(
+                    _('insufficient funds in address %(address)s'),
+                    code='invalid',
+                    params={'address': from_address}
+                )
+                return
+            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
+            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
+            if change:
+                tx_outs.append({'address': from_address,
+                                'value': int(change * 10**8)})
+
+        for to_address, amount in tx_addr_outs.items():
+            tx_outs.append({'address': to_address,
+                            'value': int(amount * 10**8)})
+
+        if op_return_data:
+            tx_outs.append({
+                'script': mk_op_return_script(op_return_data.encode('utf8')),
+                'value': 0
+            })
+
+
+class CreateRawTxView(CreateTx, View):
+
+    @staticmethod
+    def _fetch_utxo(address):
+        utxo = get_rpc_connection().gettxoutaddress(address)
+        return utxo
 
     def get(self, request, *args, **kwargs):
         form = RawTxForm(request.GET)
         if form.is_valid():
+            # Fetch the data
             from_address = form.cleaned_data['from_address']
             to_address = form.cleaned_data['to_address']
             amount = form.cleaned_data['amount']
             op_return_data = form.cleaned_data['op_return_data']
+            tx_addr_in = {from_address: {'amount': amount, 'fee': Decimal('1')}}
+            tx_addr_out = {to_address: amount}
 
-            utxos = self._fetch_utxo(from_address)
-            inputs = select_utxo(utxos, amount + 1)
-            if not inputs:
-                return JsonResponse({'error': 'insufficient funds'}, status=httplib.BAD_REQUEST)
+            ins = []
+            outs = []
+            try:
+                self.prepare_tx(ins, outs, tx_addr_in, tx_addr_out, op_return_data)
+            except TransactionError as e:
+                return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
+            except:
+                return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
 
-            ins = [utxo_to_txin(utxo) for utxo in inputs]
-            outs = [{'address': to_address, 'value': int(amount * 10**8)}]
-            # Now for the `change` part.
-            inputs_value = balance_from_utxos(inputs)
-            change = inputs_value - amount - 1
-            if change:
-                outs.append({'address': from_address,
-                             'value': int(change * 10**8)})
-
-            if op_return_data:
-                outs.append({
-                    'script': mk_op_return_script(op_return_data.encode('utf8')),
-                    'value': 0,
-                })
-                raw_tx = make_raw_tx(ins, outs)
-            else:
-                raw_tx = make_raw_tx(ins, outs)
+            # Create the transaction
+            raw_tx = make_raw_tx(ins, outs)
 
             return JsonResponse({'raw_tx': raw_tx})
         else:
             errors = ', '.join(reduce(lambda x, y: x + y, form.errors.values()))
             response = {'error': errors}
             return JsonResponse(response, status=httplib.BAD_REQUEST)
+
+
+class GeneralTxView(CsrfExemptMixin, CreateTx, View):
+
+    http_method_names = ['post']
+
+    @staticmethod
+    def _fetch_utxo(address):
+        utxo = get_rpc_connection().gettxoutaddress(address)
+        return utxo
+
+    @staticmethod
+    def _validate_json_obj(json_obj):
+        try:
+            err_name = 'json'
+            required_fields = {'tx_in', 'tx_out'}
+            required_keys = {
+                'tx_in': {'from_address', 'amount'},
+                'tx_out': {'to_address', 'amount'},
+            }
+            json_validator(json_obj, required_fields)
+            # Validation of input
+            err_name = 'tx_in'
+            for tx_in in json_obj['tx_in']:
+                json_validator(tx_in, required_keys['tx_in'])
+                address_validator(tx_in['from_address'])
+                tx_in['amount'] = Decimal(tx_in['amount'])
+                amount_validator(tx_in['amount'], min_value=0, max_value=10**10, decimal_places=8)
+                tx_in['fee'] = Decimal(tx_in['fee'])
+                amount_validator(tx_in['fee'], min_value=0, max_value=10**10, decimal_places=8)
+            # Validation of output
+            err_name = 'tx_out'
+            for tx_out in json_obj['tx_out']:
+                json_validator(tx_out, required_keys['tx_out'])
+                address_validator(tx_out['to_address'])
+                tx_out['amount'] = Decimal(tx_out['amount'])
+                amount_validator(tx_out['amount'], min_value=0, max_value=10**10, decimal_places=8)
+        except ValidationError as e:
+            e.params['name'] = err_name
+            raise e
+
+    def post(self, request, *args, **kwargs):
+        try:
+            json_obj = json.loads(request.body, parse_int=Decimal, parse_float=Decimal)
+            self._validate_json_obj(json_obj)
+        except ValidationError as e:
+            return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
+
+        # Fetch the data
+        op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
+        tx_addr_ins = self._aggregate_inputs(json_obj['tx_in'])
+        tx_addr_outs = self._aggregate_outputs(json_obj['tx_out'])
+
+        tx_ins = []
+        tx_outs = []
+
+        try:
+            self.prepare_tx(tx_ins, tx_outs, tx_addr_ins, tx_addr_outs, op_return_data)
+        except TransactionError as e:
+            return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
+        except:
+            return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
+
+        # Create the transaction
+        raw_tx = make_raw_tx(tx_ins, tx_outs)
+
+        return JsonResponse({'raw_tx': raw_tx})
 
 
 class SendRawTxView(CsrfExemptMixin, View):
@@ -154,127 +273,3 @@ class UtxoView(View):
     def get(self, request, address, *args, **kwargs):
         utxos = get_rpc_connection().gettxoutaddress(address)
         return JsonResponse(utxos, safe=False)
-
-
-class GeneralTxView(CsrfExemptMixin, View):
-    http_method_names = ['post']
-
-    @staticmethod
-    def _validate_json_obj(json_obj):
-        # Validation of input
-        if len(json_obj['tx_in']) < 1:
-            return '`tx_in` is required'
-        tx_in_key_set = {'from_address', 'amount'}
-        for tx_in in json_obj['tx_in']:
-            if not tx_in_key_set <= set(tx_in.keys()):
-                return 'objects in `tx_in` should contain keys `from_address`, `amount`'
-            try:
-                address_validator(tx_in['from_address'])
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-            tx_in['amount'] = Decimal(tx_in['amount'])
-            try:
-                amount_validator(tx_in['amount'], min_value=0, max_value=10**10, decimal_places=8)
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-            tx_in['fee'] = Decimal(tx_in['fee'])
-            try:
-                amount_validator(tx_in['fee'], min_value=0, max_value=10**10, decimal_places=8)
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-
-        # Validation of output
-        if len(json_obj['tx_out']) < 1:
-            return '`tx_out` is required'
-        tx_out_key_set = {'to_address', 'amount'}
-        for tx_out in json_obj['tx_out']:
-            if not tx_out_key_set <= set(tx_out.keys()):
-                return 'objects in `tx_out` should contain keys `to_address`, `amount`'
-            try:
-                address_validator(tx_out['to_address'])
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-            tx_out['amount'] = Decimal(tx_out['amount'])
-            try:
-                amount_validator(tx_out['amount'], min_value=0, max_value=10**10, decimal_places=8)
-            except ValidationError as e:
-                return unicode(e.message) % e.params
-
-    @staticmethod
-    def _aggregate_inputs(tx_in_list):
-        tx_ins = {}
-
-        for tx_in in tx_in_list:
-            from_address = tx_in['from_address']
-            tx_ins.setdefault(from_address, {'amount': 0, 'fee': 0})
-            tx_ins[from_address]['amount'] += tx_in['amount']
-            tx_ins[from_address]['fee'] += tx_in['fee']
-
-        return tx_ins
-
-    @staticmethod
-    def _aggregate_outputs(tx_out_list):
-        tx_outs = {}
-
-        for tx_out in tx_out_list:
-            to_address = tx_out['to_address']
-            tx_outs.setdefault(to_address, 0)
-            tx_outs[to_address] += tx_out['amount']
-
-        return tx_outs
-
-    @staticmethod
-    def _fetch_utxo(address):
-        utxos = get_rpc_connection().gettxoutaddress(address)
-        return utxos
-
-    def post(self, request, *args, **kwargs):
-        try:
-            json_obj = json.loads(request.body, parse_int=Decimal, parse_float=Decimal)
-            error_msg = self._validate_json_obj(json_obj)
-        except:
-            return JsonResponse({'error': 'invalid data'}, status=httplib.BAD_REQUEST)
-        else:
-            if error_msg:
-                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
-
-        op_return_data = json_obj['op_return_data'] if 'op_return_data' in json_obj else None
-        tx_addr_ins = self._aggregate_inputs(json_obj['tx_in'])
-        tx_addr_outs = self._aggregate_outputs(json_obj['tx_out'])
-
-        tx_ins = []
-        tx_outs = []
-
-        for from_address, amount in tx_addr_ins.items():
-            utxos = self._fetch_utxo(from_address)
-
-            vins = select_utxo(utxos, int(amount['amount'] + amount['fee']))
-            if not vins:
-                error_msg = 'insufficient funds in address {}'.format(from_address)
-                return JsonResponse({'error': error_msg}, status=httplib.BAD_REQUEST)
-
-            change = balance_from_utxos(vins) - (amount['amount'] + amount['fee'])
-
-            tx_ins += [utxo_to_txin(utxo) for utxo in vins]
-
-            if change:
-                tx_outs.append({'address': from_address,
-                                'value': int(change * 10**8)})
-
-        for to_address, amount in tx_addr_outs.items():
-            tx_outs.append({'address': to_address,
-                            'value': int(amount * 10**8)})
-
-        if op_return_data:
-            tx_outs.append({
-                'script': mk_op_return_script(op_return_data.encode('utf8')),
-                'value': 0
-            })
-
-        raw_tx = make_raw_tx(tx_ins, tx_outs)
-
-        return JsonResponse({'raw_tx': raw_tx})
