@@ -68,7 +68,8 @@ class BlockUpdateDaemon(object):
         for orphan in OrphanTxIn.objects.all():
             orphan_list = orphan_txin.setdefault(orphan.hash, [])
             try:
-                txin_db = TxIn.objects.get(hash=orphan.tx_hash, position=orphan.position)
+                tx_db = Tx.objects.get(hash=orphan.tx_hash)
+                txin_db = tx_db.tx_ins.get(position=orphan.position)
                 if txin_db.txout:
                     logger.error('Error, it must be None.')
                 orphan_list.append((txin_db, orphan.out_index))
