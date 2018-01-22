@@ -4,7 +4,6 @@ import json
 import logging
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
@@ -211,7 +210,7 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
                 address_validator(tx_out['to_address'])
                 tx_out['amount'] = Decimal(tx_out['amount'])
                 amount_validator(tx_out['amount'], min_value=0, max_value=10**10, decimal_places=8)
-        except ValidationError as e:
+        except TransactionError as e:
             e.params['name'] = err_name
             raise e
 
@@ -219,7 +218,7 @@ class GeneralTxView(CsrfExemptMixin, CreateTx, View):
         try:
             json_obj = json.loads(request.body, parse_int=Decimal, parse_float=Decimal)
             self._validate_json_obj(json_obj)
-        except ValidationError as e:
+        except TransactionError as e:
             return JsonResponse({'error': unicode(e.message) % e.params}, status=httplib.BAD_REQUEST)
 
         # Fetch the data
