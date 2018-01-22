@@ -144,9 +144,9 @@ class Tx:
         self.version = uint4(blockchain)
         self.inCount = varint(blockchain)
         self.inputs = []
-        witness_flag = 0
+        self.witness_flag = 0
         if self.inCount == 0:
-            witness_flag = varint(blockchain)
+            self.witness_flag = varint(blockchain)
             self.inCount = varint(blockchain)
         for i in range(0, self.inCount):
             input = txInput(blockchain)
@@ -157,7 +157,7 @@ class Tx:
             for i in range(0, self.outCount):
                 output = txOutput(blockchain)
                 self.outputs.append(output)
-        if not witness_flag == 0:
+        if not self.witness_flag == 0:
             for i in range(0, self.inCount):
                 self.inputs[i].parse_witness(blockchain)
         self.lockTime = uint4(blockchain)
@@ -173,11 +173,18 @@ class Tx:
         hash_ = hashlib.sha256(hashlib.sha256(headerBin).digest()).digest()
         return hash_[::-1].encode('hex_codec')
 
+    @property
+    def txID(self):
+        headerBin = serialize(self.toDict(True)).decode('hex')
+        hash_ = hashlib.sha256(hashlib.sha256(headerBin).digest()).digest()
+        return hash_[::-1].encode('hex_codec')
+
     def toString(self):
         print ""
         print "=" * 10 + " New Transaction " + "=" * 10
         print "TX Hex:\t %s" % self.txHex
         print "TX Hash:\t %s" % self.txHash
+        print "TX ID:\t %s" % self.txID
         print "Tx Version:\t %d" % self.version
         print "Inputs:\t\t %d" % self.inCount
         for i in self.inputs:
@@ -189,9 +196,9 @@ class Tx:
         print "Lock Time:\t %d" % self.lockTime
         print "TX Size:\t %d" % self.size
 
-    def toDict(self):
+    def toDict(self, flag_txid=False):
         txDict = {
-            'locktime': self.lockTime, 'version': self.version,
+            'locktime': self.lockTime, 'version': self.version, 'flag': 0 if flag_txid else self.witness_flag ,
             'ins': [], 'outs': []
         }
 
@@ -233,10 +240,11 @@ class txInput:
                 'index': self.txOutId
             },
             'script': hashStr(self.scriptSig),
-            'sequence': self.seqNo
+            'sequence': self.seqNo,
+            'witness': []
         }
         for witness in self.witnesses:
-            txDict['witness'].append(witness.toDict())
+            dict_['witness'].append(witness.toDict())
         return dict_
 
     def parse_witness(self, blockchain):

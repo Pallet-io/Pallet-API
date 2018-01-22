@@ -66,6 +66,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('hash', models.CharField(max_length=64, db_index=True)),
+                ('txid', models.CharField(max_length=64, db_index=True)),
                 ('version', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('locktime', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('size', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
@@ -103,7 +104,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('scriptsig', models.BinaryField(blank=True, null=True)),
-                ('txin', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='witnessess', related_query_name='witness', to='explorer.TxIn')),
+                ('txin', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='witnesses', related_query_name='witness', to='explorer.TxIn')),
             ],
         ),
         migrations.CreateModel(
