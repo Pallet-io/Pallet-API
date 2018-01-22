@@ -101,6 +101,7 @@ class Datadir(models.Model):
 
 class Tx(models.Model):
     hash = models.CharField(max_length=64, db_index=True)
+    txid = models.CharField(max_length=64, db_index=True)
     block = models.ForeignKey(Block, related_name='txs', related_query_name='tx')
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     locktime = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
@@ -111,6 +112,7 @@ class Tx(models.Model):
     def as_dict(self):
         return OrderedDict([
             ('hash', self.hash),
+            ('txid', self.txid),
             ('blockhash', self.block.hash),
             ('version', int(self.version)),
             ('locktime', int(self.locktime)),
@@ -121,7 +123,7 @@ class Tx(models.Model):
         ])
 
     def __str__(self):
-        return '%s' % self.hash
+        return '%s' % self.txid
 
 
 class TxOut(models.Model):

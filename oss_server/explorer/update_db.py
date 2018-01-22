@@ -268,7 +268,8 @@ class BlockDBUpdater(object):
                                       locktime=tx.lockTime,
                                       size=tx.size,
                                       time=block_db.time,
-                                      valid=True if block_db.prev_block else False
+                                      valid=True if block_db.prev_block else False,
+                                      txid=tx.txID
                                       )
 
             for i in range(tx.outCount):
