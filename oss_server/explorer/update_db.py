@@ -68,7 +68,7 @@ class BlockUpdateDaemon(object):
         for orphan in OrphanTxIn.objects.all():
             orphan_list = orphan_txin.setdefault(orphan.hash, [])
             try:
-                tx_db = Tx.objects.get(hash=orphan.tx_hash)
+                tx_db = Tx.objects.get(txid=orphan.tx_hash)
                 txin_db = tx_db.tx_ins.get(position=orphan.position)
                 if txin_db.txout:
                     logger.error('Error, it must be None.')
@@ -289,7 +289,7 @@ class BlockDBUpdater(object):
             txin_db.txout = None
         else:
             try:
-                prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash))
+                prev_tx = Tx.objects.get(txid=hashStr(txin.prevhash))
                 txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
             except Tx.DoesNotExist, TxOut.DoesNotExist:
                 orphan_list = orphan_txin.setdefault(hashStr(txin.prevhash), [])
@@ -298,7 +298,7 @@ class BlockDBUpdater(object):
                 block = tx_db.block
                 while block:
                     try:
-                        prev_tx = Tx.objects.get(hash=hashStr(txin.prevhash), block=block)
+                        prev_tx = Tx.objects.get(txid=hashStr(txin.prevhash), block=block)
                         txin_db.txout = prev_tx.tx_outs.get(position=txin.txOutId)
                         break
                     except Tx.DoesNotExist:
@@ -318,15 +318,15 @@ class BlockDBUpdater(object):
                                        valid=tx_db.valid
                                        )
 
-        orphan_list = orphan_txin.get(tx_db.hash, [])
+        orphan_list = orphan_txin.get(tx_db.txid, [])
         for txin_db, index in orphan_list:
             if index == position:
                 txin_db.txout=txout_db
                 txin_db.save()
-                logger.info('Orphan txin id {} updated!'.format(txin_db.tx.hash))
-                orphan_txin[tx_db.hash].remove((txin_db, index))
-                if not orphan_txin[tx_db.hash]:
-                    del orphan_txin[tx_db.hash]
+                logger.info('Orphan txin id {} updated!'.format(txin_db.tx.txid))
+                orphan_txin[tx_db.txid].remove((txin_db, index))
+                if not orphan_txin[tx_db.txid]:
+                    del orphan_txin[tx_db.txid]
                 break;
 
     @staticmethod
@@ -382,7 +382,7 @@ class BlockDBUpdater(object):
         for parent, orphan_list in orphan_txin.iteritems():
             for orphan, out_index in orphan_list:
                 OrphanTxIn.objects.create(hash=parent,
-                                          tx_hash=orphan.tx.hash,
+                                          tx_hash=orphan.tx.txid,
                                           position=orphan.position,
                                           out_index=out_index
                                           )
