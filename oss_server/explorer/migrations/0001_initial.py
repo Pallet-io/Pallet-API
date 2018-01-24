@@ -112,7 +112,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('hash', models.CharField(max_length=64)),
-                ('tx_hash', models.CharField(max_length=64)),
+                ('txid', models.CharField(max_length=64)),
                 ('position', models.DecimalField(decimal_places=0, max_digits=10)),
                 ('out_index', models.DecimalField(decimal_places=0, max_digits=10)),
             ],

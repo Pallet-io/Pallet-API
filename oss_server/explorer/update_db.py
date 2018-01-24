@@ -68,13 +68,13 @@ class BlockUpdateDaemon(object):
         for orphan in OrphanTxIn.objects.all():
             orphan_list = orphan_txin.setdefault(orphan.hash, [])
             try:
-                tx_db = Tx.objects.get(txid=orphan.tx_hash)
+                tx_db = Tx.objects.get(txid=orphan.txid)
                 txin_db = tx_db.tx_ins.get(position=orphan.position)
                 if txin_db.txout:
                     logger.error('Error, it must be None.')
                 orphan_list.append((txin_db, orphan.out_index))
             except Exception:
-                logger.exception('Error when load orphan txin state: {} {}'.format(orphan.tx_hash, orphan.position))
+                logger.exception('Error when load orphan txin state: {} {}'.format(orphan.txid, orphan.position))
 
 class BlockDBUpdater(object):
 
@@ -382,7 +382,7 @@ class BlockDBUpdater(object):
         for parent, orphan_list in orphan_txin.iteritems():
             for orphan, out_index in orphan_list:
                 OrphanTxIn.objects.create(hash=parent,
-                                          tx_hash=orphan.tx.txid,
+                                          txid=orphan.tx.txid,
                                           position=orphan.position,
                                           out_index=out_index
                                           )
