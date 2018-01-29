@@ -203,6 +203,6 @@ class Orphan(models.Model):
 
 class OrphanTxIn(models.Model):
     hash = models.CharField(max_length=64)
-    tx_hash = models.CharField(max_length=64)
+    txid = models.CharField(max_length=64)
     position = models.DecimalField(max_digits=10, decimal_places=0)
     out_index = models.DecimalField(max_digits=10, decimal_places=0)

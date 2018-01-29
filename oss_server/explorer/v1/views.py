@@ -100,10 +100,10 @@ class GetBlockByHeightView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetTxByHashView(View):
-    def get(self, request, tx_hash):
+class GetTxByTxidView(View):
+    def get(self, request, txid):
         try:
-            response = {'tx': Tx.objects.get(hash=tx_hash, block__in_longest=1, valid=True).as_dict()}
+            response = {'tx': Tx.objects.get(txid=txid, block__in_longest=1, valid=True).as_dict()}
             return JsonResponse(response)
         except Tx.DoesNotExist:
             response = {'error': 'tx not exist'}
@@ -131,7 +131,7 @@ class GetAddressTxsView(View):
                 tx_list = tx_list.filter(time__lt=until)
 
             try:
-                start_tx = Tx.objects.get(hash=starting_after) if starting_after else None
+                start_tx = Tx.objects.get(txid=starting_after) if starting_after else None
             except Tx.DoesNotExist:
                 response = {'error': 'tx not exist'}
                 return JsonResponse(response, status=httplib.NOT_FOUND)
@@ -140,7 +140,7 @@ class GetAddressTxsView(View):
 
             if len(txs) > 0 and txs.has_next():
                 query_dict = request.GET.copy()
-                query_dict['starting_after'] = txs[-1].hash
+                query_dict['starting_after'] = txs[-1].txid
                 page['next_uri'] = '/explorer/v1/transactions/address/' + address + '?' + query_dict.urlencode()
 
             response = {
