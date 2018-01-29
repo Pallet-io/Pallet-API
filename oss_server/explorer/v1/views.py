@@ -100,7 +100,7 @@ class GetBlockByHeightView(View):
             return JsonResponse(response, status=httplib.NOT_FOUND)
 
 
-class GetTxByIDView(View):
+class GetTxByTxidView(View):
     def get(self, request, txid):
         try:
             response = {'tx': Tx.objects.get(txid=txid, block__in_longest=1, valid=True).as_dict()}
