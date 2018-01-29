@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                 ('version', models.DecimalField(blank=True, decimal_places=0, max_digits=10, null=True)),
                 ('in_longest', models.DecimalField(blank=True, decimal_places=0, max_digits=1, null=True)),
                 ('size', models.DecimalField(blank=True, decimal_places=0, max_digits=14, null=True)),
-                ('chain_work', models.DecimalField(blank=True, decimal_places=0, max_digits=20, null=True)),
+                ('chain_work', models.DecimalField(blank=True, decimal_places=0, max_digits=30, null=True)),
                 ('tx_count', models.DecimalField(decimal_places=0, max_digits=10)),
                 ('prev_block', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='next_blocks', related_query_name='next_block', to='explorer.Block')),
             ],
