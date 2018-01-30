@@ -1,5 +1,5 @@
-# Pallium API
-A REST api for bitcoin rpc. Copyright (c) 2017-2018 Pallium Open Source Community.
+# Pallet API
+A REST api for bitcoin rpc. Copyright (c) 2017-2018 Pallet Open Source Community.
 
 ## Installation
 ### Requirement
