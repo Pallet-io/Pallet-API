@@ -28,7 +28,7 @@ class Block(models.Model):
     version = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
     in_longest = models.DecimalField(max_digits=1, decimal_places=0, blank=True, null=True)
     size = models.DecimalField(max_digits=14, decimal_places=0, blank=True, null=True)
-    chain_work = models.DecimalField(max_digits=20, decimal_places=0, blank=True, null=True)
+    chain_work = models.DecimalField(max_digits=30, decimal_places=0, blank=True, null=True)
     tx_count = models.DecimalField(max_digits=10, decimal_places=0)
 
     class Meta:
