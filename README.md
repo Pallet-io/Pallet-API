@@ -1,4 +1,4 @@
-# Pallium API
+# Pallet API
 A REST api for bitcoin rpc.
 
 ## Installation
