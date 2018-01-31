@@ -152,8 +152,9 @@ class CreateRawTxView(CreateTx, View):
             from_address = form.cleaned_data['from_address']
             to_address = form.cleaned_data['to_address']
             amount = form.cleaned_data['amount']
+            fee = form.cleaned_data['fee']
             op_return_data = form.cleaned_data['op_return_data']
-            tx_addr_in = {from_address: {'amount': amount, 'fee': Decimal('1')}}
+            tx_addr_in = {from_address: {'amount': amount, 'fee': fee}}
             tx_addr_out = {to_address: amount}
 
             ins = []

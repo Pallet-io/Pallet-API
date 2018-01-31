@@ -230,7 +230,8 @@ class CreateRawTxTest(TestCase):
         mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
         response = self.client.get(self.url, {'from_address': self.from_address,
                                               'to_address': self.to_address,
-                                              'amount': 11})
+                                              'amount': 11,
+                                              'fee': 1})
         self.assertEqual(response.status_code, httplib.OK)
         self.assertIn('raw_tx', response.json())
 
@@ -240,7 +241,8 @@ class CreateRawTxTest(TestCase):
         mock_rpc().gettxoutaddress.return_value = self.sample_txoutaddress
         response = self.client.get(self.url, {'from_address': self.from_address,
                                               'to_address': self.to_address,
-                                              'amount': 12})
+                                              'amount': 12,
+                                              'fee': 1})
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
         self.assertEqual(response.json(), {'error': 'insufficient funds in address {}'.format(self.from_address)})
 
@@ -250,7 +252,8 @@ class CreateRawTxTest(TestCase):
         response = self.client.get(self.url, {'from_address': self.from_address,
                                               'to_address': self.to_address,
                                               'color_id': 1,
-                                              'amount': 0.123456789})
+                                              'amount': 0.123456789,
+                                              'fee': 1})
         self.assertEqual(response.status_code, httplib.BAD_REQUEST)
         self.assertEqual(response.json(), {'error': '`amount` only allow up to 8 decimal digits'})
 
