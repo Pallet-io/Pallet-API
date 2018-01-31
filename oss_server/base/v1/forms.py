@@ -19,6 +19,13 @@ class RawTxForm(forms.Form):
         'max_value': '`amount` should be less than or equal to %(limit_value)s',
         'max_decimal_places': '`amount` only allow up to %(max)s decimal digits'
     })
+    fee = TxAmountField(error_messages={
+        'required': '`fee` is required',
+        'invalid': '`fee` is invalid',
+        'min_value': '`fee` should be greater than or equal to %(limit_value)s',
+        'max_value': '`fee` should be less than or equal to %(limit_value)s',
+        'max_decimal_places': '`fee` only allow up to %(max)s decimal digits'
+    })
     op_return_data = forms.CharField(required=False)
 
     def clean_op_return_data(self):
