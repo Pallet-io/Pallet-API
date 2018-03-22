@@ -1,5 +1,5 @@
 # Pallet API
-A REST api for bitcoin rpc. Copyright (c) 2017-2018 Pallet Open Source Community.
+A REST api for bitcoin rpc. Copyright (c) 2017-2018 Pallet Open Source Community. See COPYING.
 
 ## Installation
 ### Requirement
